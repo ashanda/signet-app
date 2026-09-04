@@ -101,8 +101,10 @@ watch(() => props.userId, () => fetchData())
                 <label class="form-label">Google Auth Code</label>
                 <input
                   v-model="form.google_auth_code"
-                  type="number"
-                  min="1"
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  autocomplete="one-time-code"
                   class="form-control"
                   :class="{ 'is-invalid': errors.google_auth_code }"
                   required
