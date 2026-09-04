@@ -1,0 +1,19 @@
+# Dependencies / build output
+frontend/node_modules/
+frontend/dist/
+
+# Go build artifacts (binaries are built outside the repo during dev)
+backend/signet-api
+backend/signet-api.exe
+
+# Local environment / secrets
+backend/.env
+
+# Editor/OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local runtime state
+.claude/scheduled_tasks.lock

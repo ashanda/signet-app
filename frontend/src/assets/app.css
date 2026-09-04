@@ -1,0 +1,26 @@
+/* Project-level additions on top of the real theme/volt.css +
+   theme/custome.css (loaded in main.js before this file). Everything that
+   theme/volt.css already defines (bg-gray-800, btn-gray-800, fmxw-500,
+   .sidebar sizing, .icon-shape, etc.) was deliberately removed from here —
+   it used to hold hand-rolled approximations of those classes as a stopgap
+   before the real theme CSS was wired in, and letting both define the same
+   class would fight over which one wins.
+   .badge-success/.badge-warning are intentionally NOT defined here either:
+   the original Blade views use those exact class names but neither
+   volt.css nor custome.css defines them, so the original genuinely renders
+   the KYC verified/pending status as unstyled plain text — reproduce that
+   quirk verbatim rather than inventing a pill style for it. */
+
+/* Genealogy tree (geneology/index.blade.php) */
+.geneology-tree {
+  overflow: auto;
+  max-height: 80vh;
+}
+.geneology-node {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  margin: 0.25rem;
+  text-decoration: none;
+  font-weight: 600;
+}
