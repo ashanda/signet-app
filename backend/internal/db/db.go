@@ -1,7 +1,8 @@
 // Package db opens the connection to the EXISTING MySQL database. This
 // backend never assumes a fresh schema in production — Connect() just opens
-// a pool against whatever database the operator points it at. See
-// cmd/migrate for the optional dev-only schema bootstrap.
+// a pool against whatever database the operator points it at. Schema
+// changes are versioned migrations applied by cmd/migrate (see
+// backend/migrations).
 package db
 
 import (

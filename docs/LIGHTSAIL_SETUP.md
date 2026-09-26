@@ -276,7 +276,8 @@ FRONTEND_ORIGIN=https://your-domain.com
 ```bash
 chmod 600 .env.production
 set -a; source .env.production; set +a
-go run ./cmd/migrate            # bootstraps the schema (safe to re-run)
+go run ./cmd/migrate status     # shows pending migrations (read-only)
+go run ./cmd/migrate            # applies only pending migrations (safe to re-run)
 go build -o signet-api ./cmd/api
 ```
 

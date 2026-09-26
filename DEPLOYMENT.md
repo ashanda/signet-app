@@ -23,15 +23,21 @@ files works.
 
 ## 2. Database
 
-Point the backend at your MySQL instance and run the schema bootstrap once
-(idempotent — every statement is `CREATE TABLE IF NOT EXISTS`, safe to
-re-run):
+Point the backend at your MySQL instance and run the migrations. Each
+migration in `backend/migrations/` runs once per database and is recorded in
+`schema_migrations`, so re-running only applies new ones:
 
 ```bash
 cd backend
 DB_HOST=... DB_PORT=3306 DB_DATABASE=... DB_USERNAME=... DB_PASSWORD=... \
   go run ./cmd/migrate
 ```
+
+On a database that already has the Signet tables, the first run records
+`001_initial.sql` as a baseline **without executing it**, so no existing
+table is touched. On an empty database it creates the schema. Run
+`go run ./cmd/migrate status` first to see which case applies. Details are
+in [backend/migrations/README.md](backend/migrations/README.md).
 
 ## 3. Backend
 
@@ -209,8 +215,11 @@ npm run build
 # serves it directly from the repo checkout
 ```
 
-`cmd/migrate` is safe to re-run after every pull (every statement is
-`CREATE TABLE IF NOT EXISTS`) if the schema has changed.
+Run `go run ./cmd/migrate` from `backend/` after every pull. It applies only
+the migrations in `backend/migrations/` that this database hasn't run yet
+(tracked in `schema_migrations`), so it is a no-op when nothing is new.
+`go run ./cmd/migrate status` shows what is pending. See
+[backend/migrations/README.md](backend/migrations/README.md).
 
 ## 7. Health check
 

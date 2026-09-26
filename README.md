@@ -28,8 +28,9 @@ cp .env.example .env
 # edit .env: point DB_HOST/DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD at
 # your MySQL database
 
-# Bootstraps the database schema (safe to re-run — every statement is
-# CREATE TABLE IF NOT EXISTS).
+# Applies pending migrations from backend/migrations (each runs once per
+# database; an existing database gets 001 recorded as a baseline, not run).
+# See backend/migrations/README.md.
 go run ./cmd/migrate
 
 # Start the API (default :8080)
