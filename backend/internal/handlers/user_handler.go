@@ -65,7 +65,9 @@ type userListRow struct {
 	models.User
 	CountryCode   models.NullString `db:"country_code"`
 	CountryName   models.NullString `db:"country_name"`
+	LeaderID      models.NullInt64  `db:"leader_id"`
 	LeaderName    models.NullString `db:"leader_name"`
+	ExecutiveID   models.NullInt64  `db:"executive_id"`
 	ExecutiveName models.NullString `db:"executive_name"`
 }
 
@@ -93,8 +95,8 @@ func allUsersHandler(d *app.Deps) http.HandlerFunc {
 		var total int
 		_ = d.DB.Get(&total, "SELECT COUNT(*) "+baseFrom+" "+where, args...)
 
-		listQuery := "SELECT u.*, c.code AS country_code, c.name AS country_name, lu.name AS leader_name, eu.name AS executive_name " +
-			baseFrom + " " + where + " ORDER BY u.id DESC LIMIT ? OFFSET ?"
+		listQuery := "SELECT u.*, c.code AS country_code, c.name AS country_name, lu.id AS leader_id, lu.name AS leader_name, eu.id AS executive_id, eu.name AS executive_name " +
+			baseFrom + " " + where + " ORDER BY u.id LIMIT ? OFFSET ?"
 		listArgs := append(append([]interface{}{}, args...), perPage, offset)
 		var rows []userListRow
 		_ = d.DB.Select(&rows, listQuery, listArgs...)
@@ -112,8 +114,12 @@ func allUsersHandler(d *app.Deps) http.HandlerFunc {
 				"leader_status":   row.LeaderStatus,
 				"leader_code":     row.LeaderCode.String,
 				"leader_name":     row.LeaderName.String,
-				"executive_code":  row.ExecutiveCode.String,
-				"executive_name":  row.ExecutiveName.String,
+				// $allUser->leader?->id / ->executive?->id: set only when the
+				// referenced user exists.
+				"leader_id":      row.LeaderID,
+				"executive_code": row.ExecutiveCode.String,
+				"executive_name": row.ExecutiveName.String,
+				"executive_id":   row.ExecutiveID,
 				"country": map[string]interface{}{
 					"code": row.CountryCode.String,
 					"name": row.CountryName.String,

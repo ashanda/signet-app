@@ -70,36 +70,20 @@ async function onSubmit() {
 </script>
 
 <template>
-  <AuthCardLayout max-width="500px" back-text="Back to log in" back-to="/login">
-    <div v-if="loading" class="text-center text-muted py-5">Loading&hellip;</div>
-
-    <div v-else-if="loadError" class="text-center py-4">
-      <FlashAlert type="danger" :message="loadError" />
-      <RouterLink to="/login" class="btn btn-primary mt-2">Go to Login</RouterLink>
-    </div>
-
-    <template v-else>
-      <h1 class="h3 mb-4">Step 2: Select a Package</h1>
-
-      <FlashAlert type="danger" :message="formError" @close="formError = ''" />
-      <RouterLink v-if="formError" to="/login" class="d-block mb-3">Go to Login</RouterLink>
-
-      <form @submit.prevent="onSubmit" novalidate>
+  <AuthCardLayout back-text="Back to log in" back-to="/login" back-placement="row">
+    <h1 class="h3 mb-4">Step 2: Select a Package</h1>
+    <FlashAlert type="danger" :message="loadError || formError" @close="formError = ''" />
+    <form method="POST" @submit.prevent="onSubmit">
+      <div class="form-group">
+        <label for="package">Choose your package</label>
         <input type="hidden" name="newUserID" :value="id" />
-        <div class="mb-3">
-          <label class="form-label">Package</label>
-          <select v-model="selectedPackage" class="form-select" :class="{ 'is-invalid': errors.package }" required>
-            <option value="">Select a package</option>
-            <option v-for="p in packages" :key="p.id" :value="String(p.id)">{{ p.name }} USD</option>
-          </select>
-          <div v-if="errors.package" class="invalid-feedback">{{ errors.package[0] }}</div>
-        </div>
-
-        <button type="submit" class="btn btn-primary mt-4" :disabled="submitting">
-          <span v-if="submitting" class="spinner-border spinner-border-sm me-2"></span>
-          Next
-        </button>
-      </form>
-    </template>
+        <select v-model="selectedPackage" name="package" class="form-control" required>
+          <option value="">Select Package</option>
+          <option v-for="pack in packages" :key="pack.id" :value="String(pack.id)">{{ pack.name }} USD</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary mt-4" :disabled="submitting">Next</button>
+    </form>
+    <div class="form-group"></div>
   </AuthCardLayout>
 </template>

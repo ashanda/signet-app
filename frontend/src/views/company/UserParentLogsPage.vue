@@ -3,20 +3,9 @@
 // See userparentmapslog_handler.go's userParentLogsIndexHandler/
 // userParentLogsDestroyHandler.
 //
-// Deviation from the original (flagged for the backend team): the original
-// separately looks up `App\Models\User::where('id', $log->parent_id)`.first()
-// for the "Activation Arrived User" column (name + SIG id). The Go
-// handler's response only carries the raw `parent_id` (no joined name/
-// status) — only `user_id`'s row is joined and flattened into a `user`
-// object. So the "Activation Arrived User" column here can only render
-// "SIG-00{parent_id}" without a name, unlike "New User" which has the full
-// joined record.
+// "Activation Arrived User" is the user with id = parent_id (joined
+// server-side as `parent_user`), "User not found" when there is none.
 //
-// Also note: `parent_id`/`user_id`/`created_at` are sql.Null* fields
-// scanned straight into the JSON response (no `.Int64`/`.Time` flatten in
-// the handler), so they arrive as {Int64,Valid}/{Time,Valid} objects, not
-// plain values — nullInt()/nullTime() below unwrap that. The nested `user`
-// object IS properly flattened (built via a manual map in the handler).
 import { ref, onMounted } from 'vue'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
@@ -24,6 +13,7 @@ import Paginator from '@/components/shared/Paginator.vue'
 import FlashAlert from '@/components/shared/FlashAlert.vue'
 import { useApiAction } from '@/composables/useApiAction'
 import { useAlert } from '@/composables/useToast'
+import { phpDateTime, diffForHumans } from '@/utils/format'
 
 const { run } = useApiAction()
 const { confirmDanger } = useAlert()
@@ -32,40 +22,6 @@ const logs = ref(null)
 const loading = ref(true)
 const loadError = ref('')
 const flashMessage = ref('')
-
-function nullInt(v) {
-  return v && typeof v === 'object' && v.Valid ? v.Int64 : null
-}
-
-function nullTime(v) {
-  return v && typeof v === 'object' && v.Valid ? v.Time : null
-}
-
-function fmtDate(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString()
-}
-
-function timeAgo(iso) {
-  if (!iso) return ''
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return ''
-  const seconds = Math.floor((Date.now() - then) / 1000)
-  const units = [
-    ['year', 31536000],
-    ['month', 2592000],
-    ['day', 86400],
-    ['hour', 3600],
-    ['minute', 60],
-  ]
-  for (const [name, secs] of units) {
-    const n = Math.floor(Math.abs(seconds) / secs)
-    if (n >= 1) return seconds >= 0 ? `${n} ${name}${n > 1 ? 's' : ''} ago` : `in ${n} ${name}${n > 1 ? 's' : ''}`
-  }
-  return 'just now'
-}
 
 async function fetchLogs(page = 1) {
   loading.value = true
@@ -83,12 +39,14 @@ async function fetchLogs(page = 1) {
 async function deleteLog(row) {
   const result = await confirmDanger(
     'Are you sure?',
-    'This will delete all UserParent rows linked to this mapping log!'
+    'This will delete all UserParent rows linked to this mapping log!',
   )
   if (!result.isConfirmed) return
 
+  // The original submits a DELETE form and lands back on the list with a
+  // session flash — no success dialog.
   const { ok, data } = await run(() => api.delete(`/user-parent-logs/${row.id}`), {
-    successMessage: 'Related UserParent records, referral code, user and log were deleted successfully.',
+    showSuccessAlert: false,
   })
   if (ok) {
     flashMessage.value = data?.message || 'Deleted successfully.'
@@ -131,9 +89,9 @@ onMounted(() => fetchLogs())
               <tr v-for="row in logs?.data" :key="row.id">
                 <td>{{ row.id }}</td>
                 <td>
-                  <template v-if="nullInt(row.parent_id) !== null">
-                    <span class="fst-italic text-muted">Name unavailable</span><br />
-                    <small class="text-muted">SIG ID: SIG-00{{ nullInt(row.parent_id) }}</small>
+                  <template v-if="row.parent_user">
+                    {{ row.parent_user.name || 'N/A' }}<br />
+                    <small class="text-muted">SIG ID: {{ 'SIG-00' + row.parent_user.id }}</small>
                   </template>
                   <span v-else class="text-muted">User not found</span>
                 </td>
@@ -148,9 +106,9 @@ onMounted(() => fetchLogs())
                   <span class="badge bg-secondary">{{ row.user?.status || 'unknown' }}</span>
                 </td>
                 <td>
-                  {{ fmtDate(nullTime(row.created_at)) }}
+                  {{ phpDateTime(row.created_at) }}
                   <br />
-                  <small class="text-muted">{{ timeAgo(nullTime(row.created_at)) }}</small>
+                  <small class="text-muted">{{ diffForHumans(row.created_at) }}</small>
                 </td>
                 <td class="text-end">
                   <button type="button" class="btn btn-sm btn-danger" @click="deleteLog(row)">

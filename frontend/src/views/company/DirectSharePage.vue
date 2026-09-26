@@ -1,252 +1,256 @@
 <script setup>
 // Ports company/direct_share.blade.php ("Globle Direct Share" — literal
-// on-page typo, reproduced verbatim per ui_spec.md). See
-// directshare_handler.go's directShareHandler/packagePoolStoreHandler/
-// packagePoolUpdateHandler/packagePoolDestroyHandler.
+// on-page typo, reproduced verbatim). See directshare_handler.go's
+// directShareHandler/packagePoolStoreHandler/packagePoolUpdateHandler/
+// packagePoolDestroyHandler.
 //
-// Deviations from ui_spec.md's documented markup, verified against the
-// actual Go handler (trusted over prose):
-//  - Edit/Delete actions apply only to rows where `pool.user_id == 1`
-//    (the handler signals this by simply returning each row's own
-//    `user_id` field — no separate "editable" flag — so we compare
-//    `row.user_id === 1` client-side). All other rows show the "Auto"
-//    badge, matching ui_spec.md.
-//  - "Package Value" column shows the joined package name (the handler
-//    only returns `package_name`, not a numeric package price) — "-" for
-//    user_id 1 rows per ui_spec.md.
-import { ref, onMounted } from 'vue'
+// Edit/Delete apply only to company rows (user_id 1); every other row shows
+// the "Auto" badge. "Package Value" is the pool's package price ("N/A" if
+// the package is gone), "-" for company rows. Store/update/destroy redirect
+// back with a session flash in the original; here the list is re-fetched
+// and the same alert shown. The summary's coin icon is a Phosphor class the
+// original never loads, so it renders as an empty circle there too.
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import Swal from 'sweetalert2'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import Paginator from '@/components/shared/Paginator.vue'
-import FlashAlert from '@/components/shared/FlashAlert.vue'
-import { useApiAction } from '@/composables/useApiAction'
-import { useAlert } from '@/composables/useToast'
+import { useBsModal } from '@/composables/useBsModal'
+import { numberFormat, phpDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
-const { run } = useApiAction()
-const { confirmDanger } = useAlert()
+const editModal = useBsModal()
 
-const loading = ref(true)
-const loadError = ref('')
-const flashMessage = ref('')
-
-const startDate = ref(route.query.start_date || '')
-const endDate = ref(route.query.end_date || '')
-
+const flashSuccess = ref('')
+const flashError = ref('')
+const startInput = ref('')
+const endInput = ref('')
 const companyPool = ref(0)
 const salesPool = ref(0)
 const totalPool = ref(0)
 const pools = ref(null)
 
-function fmt(n) {
-  return Number(n || 0).toFixed(2)
-}
-
-async function fetchData(page = 1) {
-  loading.value = true
-  loadError.value = ''
+async function fetchData() {
+  const q = route.query
+  startInput.value = q.start_date || ''
+  endInput.value = q.end_date || ''
   try {
-    const params = { page }
-    if (startDate.value) params.start_date = startDate.value
-    if (endDate.value) params.end_date = endDate.value
+    const params = {}
+    for (const key of ['page', 'start_date', 'end_date']) if (q[key]) params[key] = q[key]
     const { data } = await api.get('/direct-share', { params })
     companyPool.value = data.company_pool
     salesPool.value = data.sales_pool
     totalPool.value = data.total_pool
     pools.value = data.pools
   } catch (err) {
-    loadError.value = err?.response?.data?.message || 'Could not load direct share data.'
-  } finally {
-    loading.value = false
+    flashError.value = err?.response?.data?.message || 'Could not load direct share data.'
   }
 }
+
+watch(() => route.query, fetchData, { immediate: true })
 
 function applyFilter() {
-  router.replace({ query: { ...(startDate.value ? { start_date: startDate.value } : {}), ...(endDate.value ? { end_date: endDate.value } : {}) } })
-  fetchData(1)
+  router.push({ path: route.path, query: { start_date: startInput.value, end_date: endInput.value } })
 }
 
-function clearFilter() {
-  startDate.value = ''
-  endDate.value = ''
-  router.replace({ query: {} })
-  fetchData(1)
+// ->paginate(20)->withQueryString()
+function goToPage(page) {
+  router.push({ path: route.path, query: { ...route.query, page } })
 }
 
-// --- Insert Pool Amount form ---
-const insertAmount = ref('')
-const inserting = ref(false)
-async function insertPool() {
-  if (insertAmount.value === '' || insertAmount.value === null) return
-  inserting.value = true
-  const { ok, data } = await run(
-    () => api.post('/package-pools', { user_id: 1, pool_amount: Number(insertAmount.value) }),
-    { successMessage: 'Pool added successfully.' }
-  )
-  inserting.value = false
-  if (ok) {
-    flashMessage.value = data?.message || 'Pool added successfully.'
-    insertAmount.value = ''
-    fetchData(pools.value?.current_page || 1)
+async function write(request, fallback) {
+  flashSuccess.value = ''
+  flashError.value = ''
+  try {
+    const { data } = await request()
+    if (data?.status === 'error') flashError.value = data.message
+    else flashSuccess.value = data?.message || fallback
+    await fetchData()
+    return true
+  } catch (err) {
+    const errs = err?.response?.data?.errors
+    flashError.value = (errs && Object.values(errs)[0]?.[0]) || err?.response?.data?.message || 'Something went wrong'
+    return false
   }
 }
 
-// --- Edit Pool modal ---
-const showEditModal = ref(false)
+const insertAmount = ref('')
+async function insertPool() {
+  const ok = await write(() => api.post('/package-pools', { user_id: 1, pool_amount: Number(insertAmount.value) }), 'Pool added successfully.')
+  if (ok) insertAmount.value = ''
+}
+
 const editForm = ref({ id: '', pool_amount: '' })
-function openEditModal(row) {
-  editForm.value = { id: row.id, pool_amount: row.pool_amount }
-  showEditModal.value = true
+function openEdit(pool) {
+  editForm.value = { id: pool.id, pool_amount: pool.pool_amount }
+  editModal.show()
 }
 async function submitEdit() {
-  const { ok, data } = await run(
+  const ok = await write(
     () => api.put(`/package-pools/${editForm.value.id}`, { pool_amount: Number(editForm.value.pool_amount) }),
-    { successMessage: 'Pool Values updated successfully.' }
+    'Pool Values updated successfully.',
   )
-  if (ok) {
-    showEditModal.value = false
-    flashMessage.value = data?.message || 'Pool Values updated successfully.'
-    fetchData(pools.value?.current_page || 1)
-  }
+  if (ok) editModal.hide()
 }
 
-// --- Delete pool ---
-async function deletePool(row) {
-  const result = await confirmDanger('Are you sure?', 'This pool will be deleted permanently.')
-  if (!result.isConfirmed) return
-  const { ok, data } = await run(() => api.delete(`/package-pools/${row.id}`), {
-    successMessage: 'Pool Values deleted successfully.',
+function deletePool(id) {
+  Swal.fire({
+    title: 'Are you sure?',
+    text: 'This pool will be deleted permanently.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Yes, Delete',
+  }).then((result) => {
+    if (result.isConfirmed) write(() => api.delete(`/package-pools/${id}`), 'Pool Values deleted successfully.')
   })
-  if (ok) {
-    flashMessage.value = data?.message || 'Pool Values deleted successfully.'
-    fetchData(pools.value?.current_page || 1)
-  }
 }
-
-onMounted(() => fetchData())
 </script>
 
 <template>
   <DashboardLayout>
-    <FlashAlert type="success" :message="flashMessage" @close="flashMessage = ''" />
-    <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
+    <div v-if="flashSuccess" class="alert alert-success">{{ flashSuccess }}</div>
+    <div v-if="flashError" class="alert alert-danger">{{ flashError }}</div>
 
     <div class="py-4">
-      <h1 class="h4">Globle Direct Share</h1>
+      <div class="d-flex justify-content-between w-100 flex-wrap">
+        <div class="mb-3 mb-lg-0">
+          <h1 class="h4">Globle Direct Share</h1>
+        </div>
+      </div>
     </div>
 
     <div class="card border-0 shadow mb-4">
       <div class="card-body">
-        <form class="row g-2 align-items-end mb-4" @submit.prevent="applyFilter">
-          <div class="col-auto">
-            <label class="form-label small mb-1">From Date</label>
-            <input v-model="startDate" type="date" class="form-control" />
-          </div>
-          <div class="col-auto">
-            <label class="form-label small mb-1">To Date</label>
-            <input v-model="endDate" type="date" class="form-control" />
-          </div>
-          <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Filter</button>
-          </div>
-          <div v-if="startDate || endDate" class="col-auto">
-            <a href="#" class="btn btn-outline-dark" @click.prevent="clearFilter">Clear</a>
+        <!-- Search Form -->
+        <form method="GET" class="mb-3" @submit.prevent="applyFilter">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <input v-model="startInput" type="date" name="start_date" class="form-control" />
+            </div>
+            <div class="col-md-4">
+              <input v-model="endInput" type="date" name="end_date" class="form-control" />
+            </div>
+            <div class="col-md-4 d-flex">
+              <button type="submit" class="btn btn-primary me-2">
+                Filter
+              </button>
+              <RouterLink v-if="route.query.start_date || route.query.end_date" to="/direct-share" class="btn btn-outline-secondary">
+                Clear
+              </RouterLink>
+            </div>
           </div>
         </form>
 
-        <div class="p-3 rounded-4 border bg-light mb-4">
-          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-            <div>
-              <div class="text-muted small fw-semibold">Per Month Total Pool Value</div>
-              <div class="fs-4 fw-bold mt-1">USDT {{ fmt(totalPool) }}</div>
-            </div>
-            <div>
-              <div class="text-muted small fw-semibold">Sales Through Get Pool Value</div>
-              <div class="fs-4 fw-bold mt-1">USDT {{ fmt(salesPool) }}</div>
-            </div>
-            <div>
-              <div class="text-muted small fw-semibold">Company Included the Pool Value</div>
-              <div class="fs-4 fw-bold mt-1">USDT {{ fmt(companyPool) }}</div>
-            </div>
-            <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center" style="width:46px;height:46px;">
-              <i class="fas fa-coins fs-5 text-primary"></i>
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-md-12">
+            <div class="p-3 rounded-4 border bg-light h-100">
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-muted small fw-semibold">Per Month Total Pool Value</div>
+                  <div class="fs-4 fw-bold mt-1">USDT {{ numberFormat(totalPool, 2) }}</div>
+                </div>
+                <div>
+                  <div class="text-muted small fw-semibold">Sales Through Get Pool Value</div>
+                  <div class="fs-4 fw-bold mt-1">USDT {{ numberFormat(salesPool, 2) }}</div>
+                </div>
+                <div>
+                  <div class="text-muted small fw-semibold">Company Included the Pool Value</div>
+                  <div class="fs-4 fw-bold mt-1">USDT {{ numberFormat(companyPool, 2) }}</div>
+                </div>
+                <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center" style="width: 46px; height: 46px">
+                  <i class="ph-bold ph-coins fs-4 text-primary"></i>
+                </div>
+              </div>
+              <div class="mt-2 small text-muted">Total for selected Date Range</div>
             </div>
           </div>
-          <div class="mt-2 small text-muted">Total for selected Date Range</div>
         </div>
 
-        <form class="row g-2 align-items-end mb-4" @submit.prevent="insertPool">
-          <div class="col-auto">
-            <label class="form-label small mb-1">Insert Pool Amount</label>
-            <input v-model="insertAmount" type="number" step="0.01" class="form-control" required />
-          </div>
-          <div class="col-auto">
-            <button type="submit" class="btn btn-success" :disabled="inserting">Save</button>
-          </div>
-        </form>
+        <div class="row align-items-end">
+          <form method="POST" class="row g-2" @submit.prevent="insertPool">
+            <input type="hidden" name="user_id" value="1" />
+            <label class="form-label">Insert Pool Amount</label>
+            <div class="col-md-10">
+              <input v-model="insertAmount" type="number" name="pool_amount" step="0.01" class="form-control" placeholder="Enter Pool Amount" required />
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-primary w-100">
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
 
-        <div class="table-responsive">
+        <div class="table-responsive mt-4">
           <table class="table align-items-center table-flush">
             <thead class="thead-light">
               <tr>
-                <th class="border-bottom">User name</th>
-                <th class="border-bottom">SIG ID</th>
-                <th class="border-bottom">Package Value</th>
-                <th class="border-bottom">Pool Amount</th>
-                <th class="border-bottom">Date</th>
-                <th class="border-bottom">Actions</th>
+                <th class="border-bottom" scope="col">User name</th>
+                <th class="border-bottom" scope="col">SIG ID</th>
+                <th class="border-bottom" scope="col">Package Value</th>
+                <th class="border-bottom" scope="col">Pool Amount</th>
+                <th class="border-bottom" scope="col">Date</th>
+                <th class="border-bottom" scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!loading && !pools?.data?.length">
-                <td colspan="6" class="text-center text-muted py-4">No pools data found</td>
-              </tr>
-              <tr v-for="row in pools?.data" :key="row.id">
-                <td>{{ row.user_name || '—' }}</td>
-                <td>SIG-00{{ row.user_id }}</td>
-                <td>{{ Number(row.user_id) === 1 ? '-' : row.package_name || '-' }}</td>
-                <td>{{ fmt(row.pool_amount) }}</td>
-                <td>{{ row.created_at ? String(row.created_at).slice(0, 10) : '' }}</td>
+              <tr v-for="pool in pools?.data" :key="pool.id">
+                <td>{{ pool.user_name }}</td>
+                <td>{{ 'SIG-00' + pool.user_id }}</td>
+                <td>{{ pool.user_id == 1 ? '-' : (pool.package_price ?? 'N/A') }}</td>
+                <td>{{ Number(pool.pool_amount || 0).toFixed(2) }}</td>
+                <td>{{ phpDateTime(pool.created_at, 10) }}</td>
                 <td>
-                  <template v-if="Number(row.user_id) === 1">
-                    <button type="button" class="btn btn-sm btn-warning me-1" @click="openEditModal(row)">
-                      <i class="fas fa-pencil-alt"></i>
+                  <template v-if="pool.user_id == 1">
+                    <button type="button" class="btn btn-sm btn-warning" @click="openEdit(pool)">
+                      <i class="fas fa-edit"></i>
                     </button>
-                    <button type="button" class="btn btn-sm btn-danger" @click="deletePool(row)">
-                      <i class="fas fa-trash"></i>
-                    </button>
+                    <form class="d-inline" @submit.prevent>
+                      <button type="button" class="btn btn-sm btn-danger" @click="deletePool(pool.id)">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </form>
                   </template>
                   <span v-else class="badge bg-secondary">Auto</span>
                 </td>
               </tr>
+              <tr v-if="pools && !pools.data?.length">
+                <td colspan="4" class="text-center text-muted">No pools data found</td>
+              </tr>
             </tbody>
           </table>
+          <div class="d-flex justify-content-center">
+            <Paginator :pagination="pools" @change="goToPage" />
+          </div>
         </div>
-        <Paginator :pagination="pools" @change="(p) => fetchData(p)" />
       </div>
     </div>
 
-    <!-- Edit Pool Amount modal -->
-    <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+    <div :ref="editModal.el" class="modal fade" tabindex="-1">
       <div class="modal-dialog">
-        <div class="modal-content">
-          <form @submit.prevent="submitEdit">
+        <form method="POST" @submit.prevent="submitEdit">
+          <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">Edit Pool Amount</h5>
-              <button type="button" class="btn-close" @click="showEditModal = false"></button>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-              <label class="form-label">Pool Amount</label>
-              <input v-model="editForm.pool_amount" type="number" step="0.01" class="form-control" required />
+              <div class="mb-3">
+                <label class="form-label">Pool Amount</label>
+                <input v-model="editForm.pool_amount" type="number" name="pool_amount" step="0.01" class="form-control" required />
+              </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" @click="showEditModal = false">Close</button>
-              <button type="submit" class="btn btn-primary">Update</button>
+              <button class="btn btn-primary">
+                Update
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   </DashboardLayout>

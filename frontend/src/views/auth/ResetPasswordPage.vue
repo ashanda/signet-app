@@ -1,44 +1,24 @@
 <script setup>
 // Ports auth/password_reset_form.blade.php (route('password.reset', $token) /
-// route('password.update')). See passwordResetTokenHandler / passwordResetHandler
-// in auth_handler.go.
-import { onMounted, reactive, ref } from 'vue'
+// route('password.update')). See passwordResetHandler in auth_handler.go.
+// As in the original, the email field starts empty, field errors show under
+// their inputs, and a successful reset lands on the login page.
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/api/client'
 import AuthCardLayout from '@/components/layout/AuthCardLayout.vue'
-import FlashAlert from '@/components/shared/FlashAlert.vue'
 
 const props = defineProps({
   token: { type: String, required: true },
 })
 
+const router = useRouter()
 const form = reactive({ email: '', password: '', password_confirmation: '' })
 const errors = ref({})
-const flashMessage = ref('')
-const flashType = ref('danger')
-const loading = ref(true)
 const submitting = ref(false)
-const done = ref(false)
-
-onMounted(async () => {
-  try {
-    const { data } = await api.get(`/password/reset/${props.token}`)
-    if (data.status === 'success') {
-      form.email = data.email || ''
-    } else {
-      flashMessage.value = data.message || 'This password reset token is invalid.'
-      flashType.value = 'danger'
-    }
-  } catch (err) {
-    flashMessage.value = err?.response?.data?.message || 'This password reset token is invalid.'
-    flashType.value = 'danger'
-  } finally {
-    loading.value = false
-  }
-})
 
 async function onSubmit() {
   errors.value = {}
-  flashMessage.value = ''
   submitting.value = true
   try {
     const { data } = await api.post('/password/reset', {
@@ -48,20 +28,12 @@ async function onSubmit() {
       password_confirmation: form.password_confirmation,
     })
     if (data.status === 'success') {
-      done.value = true
-      flashType.value = 'success'
-      flashMessage.value = data.message || 'Your password has been reset!'
-    } else {
-      flashType.value = 'danger'
-      flashMessage.value = data.message || 'Something went wrong. Please try again.'
+      router.push('/login')
+    } else if (data.errors) {
+      errors.value = data.errors
     }
   } catch (err) {
-    if (err?.response?.status === 422) {
-      errors.value = err.response.data.errors || {}
-    } else {
-      flashType.value = 'danger'
-      flashMessage.value = err?.response?.data?.message || 'Something went wrong. Please try again.'
-    }
+    errors.value = err?.response?.data?.errors || {}
   } finally {
     submitting.value = false
   }
@@ -69,72 +41,48 @@ async function onSubmit() {
 </script>
 
 <template>
-  <AuthCardLayout max-width="500px" back-text="Back to log in" back-to="/login">
+  <AuthCardLayout back-text="Back to log in" back-to="/login" back-placement="row">
     <h1 class="h3 mb-4">Reset password</h1>
-
-    <FlashAlert :type="flashType" :message="flashMessage" @close="flashMessage = ''" />
-
-    <div v-if="loading" class="text-center text-muted py-4">Loading&hellip;</div>
-
-    <div v-else-if="done" class="text-center py-3">
-      <RouterLink to="/login" class="btn btn-gray-800">Go to Login</RouterLink>
-    </div>
-
-    <form v-else @submit.prevent="onSubmit" novalidate>
+    <form method="POST" @submit.prevent="onSubmit">
       <input type="hidden" name="token" :value="token" />
-
-      <div class="mb-3">
-        <label class="form-label" for="email">Your Email</label>
-        <input
-          id="email"
-          v-model="form.email"
-          type="email"
-          name="email"
-          class="form-control"
-          :class="{ 'is-invalid': errors.email }"
-          placeholder="example@company.com"
-          required
-        />
-        <div v-if="errors.email" class="invalid-feedback">{{ errors.email[0] }}</div>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label" for="password">Password</label>
-        <div class="input-group">
-          <span class="input-group-text"><i class="fas fa-lock"></i></span>
-          <input
-            id="password"
-            v-model="form.password"
-            type="password"
-            name="password"
-            class="form-control"
-            :class="{ 'is-invalid': errors.password }"
-            placeholder="Password"
-            required
-          />
-          <div v-if="errors.password" class="invalid-feedback">{{ errors.password[0] }}</div>
-        </div>
-      </div>
-
+      <!-- Form -->
       <div class="mb-4">
-        <label class="form-label" for="password_confirmation">Confirm Password</label>
+        <label for="email">Your Email</label>
         <div class="input-group">
-          <span class="input-group-text"><i class="fas fa-lock"></i></span>
-          <input
-            id="password_confirmation"
-            v-model="form.password_confirmation"
-            type="password"
-            name="password_confirmation"
-            class="form-control"
-            placeholder="Confirm Password"
-            required
-          />
+          <input id="email" v-model="form.email" type="email" class="form-control" :class="{ 'is-invalid': errors.email }" name="email" required />
+        </div>
+        <span v-if="errors.email" class="invalid-feedback" role="alert">
+          <strong>{{ errors.email[0] }}</strong>
+        </span>
+      </div>
+      <!-- End of Form -->
+      <!-- Form -->
+      <div class="form-group mb-4">
+        <label for="password">Your Password</label>
+        <div class="input-group">
+          <span id="basic-addon2" class="input-group-text">
+            <svg class="icon icon-xs text-gray-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path></svg>
+          </span>
+          <input id="password" v-model="form.password" type="password" class="form-control" :class="{ 'is-invalid': errors.password }" name="password" required />
+          <span v-if="errors.password" class="invalid-feedback" role="alert">
+            <strong>{{ errors.password[0] }}</strong>
+          </span>
         </div>
       </div>
-
+      <!-- End of Form -->
+      <!-- Form -->
+      <div class="form-group mb-4">
+        <label for="confirm_password">Confirm Password</label>
+        <div class="input-group">
+          <span class="input-group-text">
+            <svg class="icon icon-xs text-gray-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path></svg>
+          </span>
+          <input id="password_confirmation" v-model="form.password_confirmation" type="password" class="form-control" name="password_confirmation" required />
+        </div>
+      </div>
+      <!-- End of Form -->
       <div class="d-grid">
         <button type="submit" class="btn btn-gray-800" :disabled="submitting">
-          <span v-if="submitting" class="spinner-border spinner-border-sm me-2"></span>
           Reset password
         </button>
       </div>

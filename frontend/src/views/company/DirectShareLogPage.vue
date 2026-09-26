@@ -1,16 +1,10 @@
 <script setup>
 // Ports company/direct_share_log.blade.php ("Globle Direct Share Log" —
-// typo reproduced verbatim per ui_spec.md). See
-// directshare_handler.go's directShareLogHandler.
-//
-// Deviation from ui_spec.md's documented markup, verified against the
-// actual Go handler (trusted over prose): ui_spec.md documents a "Binance
-// Pay ID" column (with a copy-to-clipboard icon button). The handler's SQL
-// only selects `gswl.user_id, gswl.amount, gswl.description,
-// gswl.created_at` plus the joined `user_name` — no `binance_pay_id` is
-// returned, so that column/button is omitted here (rendered as "—") rather
-// than fabricated. Flagged for the backend team.
-import { ref, onMounted } from 'vue'
+// typo reproduced verbatim). See directshare_handler.go's
+// directShareLogHandler. The heading shows the effective range (defaulting
+// to last month); the inputs only show what was actually requested, and
+// "Clear" only appears when a date was given — as in the original GET form.
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
@@ -20,44 +14,47 @@ import FlashAlert from '@/components/shared/FlashAlert.vue'
 const route = useRoute()
 const router = useRouter()
 
-const loading = ref(true)
 const loadError = ref('')
-
-const startDate = ref(route.query.start_date || '')
-const endDate = ref(route.query.end_date || '')
+const startInput = ref('')
+const endInput = ref('')
+const startDate = ref('')
+const endDate = ref('')
 const pools = ref(null)
 
-async function fetchData(page = 1) {
-  loading.value = true
+async function fetchData() {
   loadError.value = ''
+  const q = route.query
+  startInput.value = q.start_date || ''
+  endInput.value = q.end_date || ''
   try {
-    const params = { page }
-    if (startDate.value) params.start_date = startDate.value
-    if (endDate.value) params.end_date = endDate.value
+    const params = {}
+    for (const key of ['page', 'start_date', 'end_date']) if (q[key]) params[key] = q[key]
     const { data } = await api.get('/direct-share-log', { params })
     startDate.value = data.start_date
     endDate.value = data.end_date
     pools.value = data.pools
   } catch (err) {
     loadError.value = err?.response?.data?.message || 'Could not load direct share log.'
-  } finally {
-    loading.value = false
   }
 }
 
+watch(() => route.query, fetchData, { immediate: true })
+
 function applyFilter() {
-  router.replace({ query: { ...(startDate.value ? { start_date: startDate.value } : {}), ...(endDate.value ? { end_date: endDate.value } : {}) } })
-  fetchData(1)
+  router.push({ path: route.path, query: { start_date: startInput.value, end_date: endInput.value } })
 }
 
-function clearFilter() {
-  startDate.value = ''
-  endDate.value = ''
-  router.replace({ query: {} })
-  fetchData(1)
+// ->paginate(20)->withQueryString(): page links keep the filter.
+function goToPage(page) {
+  router.push({ path: route.path, query: { ...route.query, page } })
 }
 
-onMounted(() => fetchData())
+function copyBinance(value) {
+  navigator.clipboard
+    .writeText(value)
+    .then(() => window.alert('Binance Pay ID copied: ' + value))
+    .catch(() => window.alert('Copy failed'))
+}
 </script>
 
 <template>
@@ -65,54 +62,70 @@ onMounted(() => fetchData())
     <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
 
     <div class="py-4">
-      <h1 class="h4">Globle Direct Share Log - {{ startDate }} to {{ endDate }}</h1>
+      <div class="d-flex justify-content-between w-100 flex-wrap">
+        <div class="mb-3 mb-lg-0">
+          <h1 class="h4">Globle Direct Share Log - {{ startDate }} to {{ endDate }}</h1>
+        </div>
+      </div>
     </div>
 
     <div class="card border-0 shadow mb-4">
       <div class="card-body">
-        <form class="row g-2 align-items-end mb-4" @submit.prevent="applyFilter">
-          <div class="col-auto">
-            <label class="form-label small mb-1">From Date</label>
-            <input v-model="startDate" type="date" class="form-control" />
-          </div>
-          <div class="col-auto">
-            <label class="form-label small mb-1">To Date</label>
-            <input v-model="endDate" type="date" class="form-control" />
-          </div>
-          <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Filter</button>
-          </div>
-          <div v-if="startDate || endDate" class="col-auto">
-            <a href="#" class="btn btn-outline-dark" @click.prevent="clearFilter">Clear</a>
+        <!-- Search Form -->
+        <form method="GET" class="mb-3" @submit.prevent="applyFilter">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <input v-model="startInput" type="date" name="start_date" class="form-control" />
+            </div>
+            <div class="col-md-4">
+              <input v-model="endInput" type="date" name="end_date" class="form-control" />
+            </div>
+            <div class="col-md-4 d-flex">
+              <button type="submit" class="btn btn-primary me-2">
+                Filter
+              </button>
+              <RouterLink v-if="route.query.start_date || route.query.end_date" to="/direct-share-log" class="btn btn-outline-secondary">
+                Clear
+              </RouterLink>
+            </div>
           </div>
         </form>
 
-        <div class="table-responsive">
+        <div class="table-responsive mt-4">
           <table class="table align-items-center table-flush">
             <thead class="thead-light">
               <tr>
-                <th class="border-bottom">User name</th>
-                <th class="border-bottom">SIG ID</th>
-                <th class="border-bottom">Binance Pay ID</th>
-                <th class="border-bottom">Amount</th>
-                <th class="border-bottom">Date</th>
+                <th class="border-bottom" scope="col">User name</th>
+                <th class="border-bottom" scope="col">SIG ID</th>
+                <th class="border-bottom" scope="col">Binance Pay ID</th>
+                <th class="border-bottom" scope="col">Amount</th>
+                <th class="border-bottom" scope="col">Date</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!loading && !pools?.data?.length">
-                <td colspan="5" class="text-center text-muted py-4">No pools data found</td>
+              <tr v-for="pool in pools?.data" :key="pool.id">
+                <td>{{ pool.user_name }}</td>
+                <td>{{ 'SIG-00' + pool.user_id }}</td>
+                <td>
+                  <span :id="'binance-' + pool.id">
+                    {{ pool.binance_pay_id }}
+                  </span>
+                  <button type="button" class="btn btn-sm btn-link p-0 ms-2" title="Copy Binance Pay ID" @click="copyBinance(pool.binance_pay_id)">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </td>
+                <td>{{ pool.amount }}</td>
+                <td>{{ pool.created_at ? String(pool.created_at).slice(0, 10) : '' }}</td>
               </tr>
-              <tr v-for="row in pools?.data" :key="row.id">
-                <td>{{ row.user_name || '—' }}</td>
-                <td>SIG-00{{ row.user_id }}</td>
-                <td>—</td>
-                <td>{{ Number(row.amount || 0).toFixed(2) }}</td>
-                <td>{{ row.created_at ? String(row.created_at).slice(0, 10) : '' }}</td>
+              <tr v-if="pools && !pools.data?.length">
+                <td colspan="4" class="text-center text-muted">No pools data found</td>
               </tr>
             </tbody>
           </table>
+          <div class="d-flex justify-content-center">
+            <Paginator :pagination="pools" @change="goToPage" />
+          </div>
         </div>
-        <Paginator :pagination="pools" @change="(p) => fetchData(p)" />
       </div>
     </div>
   </DashboardLayout>

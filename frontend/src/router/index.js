@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/auth'
 // "any authenticated user"; `meta.public: true` means no auth required at
 // all (login, register, password reset, the marketing homepage).
 const routes = [
-  { path: '/', name: 'home', component: () => import('@/views/PublicHomePage.vue'), meta: { public: true } },
+  { path: '/', name: 'home', component: () => import('@/views/PublicHomePage.vue'), meta: { public: true, skin: 'site' } },
   { path: '/login', name: 'login', component: () => import('@/views/auth/LoginPage.vue'), meta: { public: true } },
   { path: '/password/reset', name: 'password.request', component: () => import('@/views/auth/ForgotPasswordPage.vue'), meta: { public: true } },
   { path: '/password/reset/:token', name: 'password.reset', component: () => import('@/views/auth/ResetPasswordPage.vue'), meta: { public: true }, props: true },
@@ -19,12 +19,12 @@ const routes = [
       const auth = useAuthStore()
       return auth.dashboardRoute
     } },
-  { path: '/admin/dashboard', name: 'admin.dashboard', component: () => import('@/views/admin/AdminDashboardPage.vue'), meta: { roles: ['admin'] } },
+  { path: '/admin/dashboard', name: 'admin.dashboard', component: () => import('@/views/admin/AdminDashboardPage.vue'), meta: { roles: ['admin'], bodyClass: 'sg-dashboard' } },
   { path: '/admin/:userId/setup-google-auth', name: 'setup.google.auth', component: () => import('@/views/admin/SetupGoogleAuthPage.vue'), meta: { roles: ['company', 'admin'] }, props: true },
-  { path: '/agent/dashboard', name: 'agent.dashboard', component: () => import('@/views/agent/AgentDashboardPage.vue'), meta: { roles: ['agent'] } },
-  { path: '/user/dashboard', name: 'user.dashboard', component: () => import('@/views/user/UserDashboardPage.vue'), meta: { roles: ['user'] } },
+  { path: '/agent/dashboard', name: 'agent.dashboard', component: () => import('@/views/agent/AgentDashboardPage.vue'), meta: { roles: ['agent'], bodyClass: 'sg-dashboard' } },
+  { path: '/user/dashboard', name: 'user.dashboard', component: () => import('@/views/user/UserDashboardPage.vue'), meta: { roles: ['user'], bodyClass: 'sg-dashboard' } },
 
-  { path: '/company/dashboard', name: 'company.dashboard', component: () => import('@/views/company/CompanyDashboardPage.vue'), meta: { roles: ['company'] } },
+  { path: '/company/dashboard', name: 'company.dashboard', component: () => import('@/views/company/CompanyDashboardPage.vue'), meta: { roles: ['company'], bodyClass: 'sg-dashboard' } },
   { path: '/company/pending-activation', name: 'company.pending.activation', component: () => import('@/views/company/PendingActivationPage.vue'), meta: { roles: ['company'] } },
   { path: '/new-activations', name: 'new.activations', component: () => import('@/views/company/NewActivationsPage.vue'), meta: { roles: ['company'] } },
   { path: '/users', name: 'company.users', component: () => import('@/views/company/UsersPage.vue'), meta: { roles: ['company', 'admin'] } },
@@ -58,7 +58,7 @@ const routes = [
   { path: '/my-geneology', name: 'my.geneology', component: () => import('@/views/geneology/GeneologyIndexPage.vue') },
   { path: '/geneology/:userId', name: 'geneology.show', component: () => import('@/views/geneology/GeneologyShowPage.vue'), props: true },
 
-  { path: '/kyc', name: 'kyc.index', component: () => import('@/views/kyc/KycIndexPage.vue'), meta: { roles: ['company'] } },
+  { path: '/kyc', name: 'kyc.index', component: () => import('@/views/kyc/KycIndexPage.vue') },
   { path: '/kyc/show', name: 'kyc.show', component: () => import('@/views/kyc/KycShowPage.vue') },
   { path: '/kyc/create', name: 'kyc.create', component: () => import('@/views/kyc/KycCreatePage.vue') },
   { path: '/kyc/:id/edit', name: 'kyc.edit', component: () => import('@/views/kyc/KycEditPage.vue'), props: true },
@@ -70,7 +70,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior() {
+  scrollBehavior(to, from) {
+    // In-page anchors (the welcome page's #about, #faq, ...) are plain
+    // <a href="#..."> links: leave the browser's own jump alone.
+    if (to.hash && to.path === from.path) return false
+    if (to.hash) return { el: to.hash }
     return { top: 0 }
   },
 })

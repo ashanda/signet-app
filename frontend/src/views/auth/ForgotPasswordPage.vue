@@ -4,7 +4,6 @@
 import { ref } from 'vue'
 import api from '@/api/client'
 import AuthCardLayout from '@/components/layout/AuthCardLayout.vue'
-import FlashAlert from '@/components/shared/FlashAlert.vue'
 
 const email = ref('')
 const errors = ref({})
@@ -31,34 +30,31 @@ async function onSubmit() {
 </script>
 
 <template>
-  <AuthCardLayout max-width="500px" back-text="Back to log in" back-to="/login">
-    <h1 class="h3 mb-2">Forgot your password?</h1>
-    <p class="text-muted mb-4">
-      Enter your email address and we'll send you a link to reset your password.
-    </p>
-
-    <FlashAlert type="success" :message="statusMessage" @close="statusMessage = ''" />
-
-    <form @submit.prevent="onSubmit" novalidate>
+  <AuthCardLayout
+    back-text="Back to log in"
+    back-to="/login"
+    back-placement="row"
+    card-class="signin-inner my-3 my-lg-0 bg-white shadow border-0 rounded p-4 p-lg-5 w-100 fmxw-500"
+  >
+    <h1 class="h3">Forgot your password?</h1>
+    <p class="mb-4">Don't fret! Just type in your email and we will send you a code to reset your password!</p>
+    <div v-if="statusMessage" class="alert alert-success" role="alert">
+      {{ statusMessage }}
+    </div>
+    <form method="POST" @submit.prevent="onSubmit">
+      <!-- Form -->
       <div class="mb-4">
-        <label class="form-label" for="email">Your Email</label>
-        <input
-          id="email"
-          v-model="email"
-          type="email"
-          name="email"
-          class="form-control"
-          :class="{ 'is-invalid': errors.email }"
-          placeholder="example@company.com"
-          autofocus
-          required
-        />
-        <div v-if="errors.email" class="invalid-feedback">{{ errors.email[0] }}</div>
+        <label for="email">Your Email</label>
+        <div class="input-group">
+          <input id="email" v-model="email" type="email" class="form-control" :class="{ 'is-invalid': errors.email }" name="email" required autofocus />
+        </div>
+        <span v-if="errors.email" class="invalid-feedback" role="alert">
+          <strong>{{ errors.email[0] }}</strong>
+        </span>
       </div>
-
+      <!-- End of Form -->
       <div class="d-grid">
         <button type="submit" class="btn btn-gray-800" :disabled="submitting">
-          <span v-if="submitting" class="spinner-border spinner-border-sm me-2"></span>
           Recover password
         </button>
       </div>

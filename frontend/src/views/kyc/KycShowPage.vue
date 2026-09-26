@@ -1,153 +1,209 @@
 <script setup>
-// Ports kyc/show.blade.php ("KYC" card-grid variant — route('kyc.show'),
-// non-company: own KYC). See kyc_handler.go's kycIndexHandler (also
-// mounted at GET /kyc/show — same handler, "kyc.show mirrors kyc.index's
-// logic exactly" per its own doc comment): for a non-company user this
-// returns `{status, alert, message, kycs: [0 or 1 record]}` (`is_verified`
-// determines the flashed `alert`/`message` pair, surfaced here via
-// FlashAlert as a small enhancement over the bare card-grid ui_spec.md
-// describes).
-//
-// Per ui_spec.md's explicitly-preserved quirk: the "Verified KYC" button
-// is rendered regardless of role (only meaningfully clickable for company,
-// who wouldn't normally land on this view) — reproduced verbatim, not
-// "fixed".
-//
-// DEVIATION (flagged, not fabricated): ui_spec.md documents a "Telegrame
-// Join Link" bonus panel on a verified record with one "Join Telegram"
-// button per user package's `telegram_link`. kycIndexHandler's response
-// carries no such data (models.Kyc has no telegram_link/user-packages
-// join), and no endpoint reachable by a non-company user returns a
-// package's telegram_link (GET /packages is company-only; GET
-// /buy-package-history's user_packages rows carry only the raw package id,
-// unjoined). The compliance warning copy is reproduced as a best-effort
-// paraphrase (ui_spec.md describes its existence/tone but not its exact
-// wording, so the literal original string isn't available to port
-// verbatim) with a note in place of fabricated per-package buttons/links.
+// Ports kyc/show.blade.php (route('kyc.show') — the sidebar's KYC link for
+// non-company users). See kyc_handler.go's kycIndexHandler(d, true): the
+// user's own KYC record, the page-load SweetAlert, and — for the "Telegrame
+// Join Link" panel shown once verified — one Telegram link per active
+// package. The Verify/Unverify branch only applies to company users, who
+// normally land on the KYC list instead.
 import { ref, onMounted } from 'vue'
+import Swal from 'sweetalert2'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
-import FlashAlert from '@/components/shared/FlashAlert.vue'
-import { useAlert } from '@/composables/useToast'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/store/auth'
+import { nullStr } from '@/utils/format'
 
-function nsGet(v) {
-  if (v == null) return ''
-  if (typeof v === 'object') return v.Valid ? v.String : ''
-  return v
-}
+const auth = useAuthStore()
+const router = useRouter()
 
-const { confirmDanger, alertSuccess, alertError } = useAlert()
+const flashSuccess = ref('')
+const flashError = ref('')
+const kycs = ref(null)
+const telegramLinks = ref([])
 
-const loading = ref(true)
-const loadError = ref('')
-const alertType = ref('')
-const alertMessage = ref('')
-const kycs = ref([])
+const rows = () => (Array.isArray(kycs.value) ? kycs.value : kycs.value?.data || [])
 
 async function fetchData() {
-  loading.value = true
-  loadError.value = ''
   try {
     const { data } = await api.get('/kyc/show')
-    kycs.value = data.kycs || []
-    alertType.value = data.alert === 'success' ? 'success' : data.alert === 'warning' ? 'danger' : 'info'
-    alertMessage.value = data.alert === 'info' ? '' : data.message || ''
+    kycs.value = data.kycs
+    telegramLinks.value = data.telegram_links || []
+    if (data.alert) Swal.fire({ icon: data.alert.icon, title: data.alert.title, text: data.alert.text })
   } catch (err) {
-    loadError.value = err?.response?.data?.message || 'Could not load your KYC record.'
-  } finally {
-    loading.value = false
-  }
-}
-
-function docUrl(path) {
-  return path ? `/storage/${path}` : ''
-}
-
-async function deleteKyc(row) {
-  const result = await confirmDanger('Are you sure?', 'This KYC record will be deleted permanently.')
-  if (!result.isConfirmed) return
-  try {
-    const { data } = await api.delete(`/kyc/${row.id}`)
-    await alertSuccess(data.message || 'KYC deleted.')
-    fetchData()
-  } catch (err) {
-    await alertError(err?.response?.data?.message || 'Could not delete KYC.')
+    flashError.value = err?.response?.data?.message || 'Could not load your KYC record.'
   }
 }
 
 onMounted(fetchData)
+
+// destroy redirects to the KYC list; verify/unverify redirect back here
+// with a success flash.
+async function destroy(kyc) {
+  if (!window.confirm('Are you sure?')) return
+  try {
+    await api.delete(`/kyc/${kyc.id}`)
+    router.push({ name: 'kyc.index' })
+  } catch (err) {
+    flashError.value = err?.response?.data?.message || 'Something went wrong'
+  }
+}
+
+async function setVerified(kyc, verified) {
+  flashSuccess.value = ''
+  try {
+    await api.post(`/kyc/${kyc.id}/${verified ? 'verify' : 'unverify'}`)
+    flashSuccess.value = verified ? 'KYC verified successfully.' : 'KYC unverified successfully.'
+    fetchData()
+  } catch (err) {
+    flashError.value = err?.response?.data?.message || 'Something went wrong'
+  }
+}
+
+const docUrl = (path) => '/storage/' + path
 </script>
 
 <template>
   <DashboardLayout>
-    <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
-    <FlashAlert :type="alertType" :message="alertMessage" @close="alertMessage = ''" />
-
-    <div class="py-4 d-flex align-items-center justify-content-between">
-      <h1 class="h4 mb-0">KYC</h1>
-      <router-link :to="{ name: 'kyc.verified' }" class="btn btn-success">Verified KYC</router-link>
+    <div v-if="flashSuccess" class="alert alert-success">{{ flashSuccess }}</div>
+    <div v-if="flashError" class="alert alert-danger">{{ flashError }}</div>
+    <div class="py-4">
+      <div class="d-flex justify-content-between w-100 flex-wrap">
+        <div class="mb-3 mb-lg-0">
+          <h1 class="h4">KYC</h1>
+        </div>
+      </div>
     </div>
+    <div class="card border-0 shadow mb-4">
+      <div class="card-body">
+        <div class="row">
+          <template v-for="kyc in rows()" :key="kyc.id">
+            <div class="col-md-6 col-lg-6 mb-6">
+              <div class="card border-0">
+                <div class="card-body d-flex flex-column justify-content-between">
+                  <!-- Header Section -->
+                  <h5 class="card-title mb-3 text-primary fw-semibold">
+                    <i class="fas fa-user me-2"></i>{{ kyc.full_name }}
+                  </h5>
+                  <div class="alert alert-info">
+                    <!-- Personal Info -->
+                    <ul class="list-unstyled mb-3 small">
+                      <li><i class="fas fa-envelope me-2 text-secondary"></i><strong>Email:</strong> {{ kyc.email }}</li>
+                      <li><i class="fab fa-whatsapp me-2 text-success"></i><strong>WhatsApp 1:</strong> {{ kyc.contact_number1 }}</li>
+                      <li><i class="fab fa-whatsapp me-2 text-muted"></i><strong>WhatsApp 2:</strong> {{ nullStr(kyc.contact_number2) || '—' }}</li>
+                      <li><i class="fas fa-map-marker-alt me-2 text-danger"></i><strong>Address:</strong> {{ kyc.address }}</li>
+                      <li><i class="fab fa-telegram me-2 text-info"></i><strong>Telegram:</strong> {{ nullStr(kyc.telegram_username) || '—' }}</li>
+                      <li>
+                        <i class="fas fa-id-card me-2 text-dark"></i>
+                        <strong>{{ String(kyc.document_type || '').toUpperCase() }}:</strong> {{ kyc.document_number }}
+                      </li>
+                    </ul>
 
-    <div v-if="!loading && !kycs.length" class="text-center py-5">
-      <p class="text-muted mb-3">You have not submitted your KYC yet.</p>
-      <router-link :to="{ name: 'kyc.create' }" class="btn btn-primary">Submit KYC</router-link>
-    </div>
+                    <!-- Document Previews -->
+                    <div class="mb-3">
+                      <strong class="d-block mb-1 text-muted">Documents:</strong>
+                      <div v-if="kyc.document_type === 'nic'" class="d-flex align-items-center gap-2">
+                        <a v-if="nullStr(kyc.nic_front)" :href="docUrl(nullStr(kyc.nic_front))" target="_blank" data-bs-toggle="tooltip" title="NIC Front">
+                          <img :src="docUrl(nullStr(kyc.nic_front))" width="50" class="rounded border" />
+                        </a>
+                        <a v-if="nullStr(kyc.nic_back)" :href="docUrl(nullStr(kyc.nic_back))" target="_blank" data-bs-toggle="tooltip" title="NIC Back">
+                          <img :src="docUrl(nullStr(kyc.nic_back))" width="50" class="rounded border" />
+                        </a>
+                      </div>
+                      <template v-else-if="kyc.document_type === 'passport'">
+                        <a v-if="nullStr(kyc.passport_image)" :href="docUrl(nullStr(kyc.passport_image))" target="_blank" data-bs-toggle="tooltip" title="Passport">
+                          <img :src="docUrl(nullStr(kyc.passport_image))" width="60" class="rounded border" />
+                        </a>
+                      </template>
+                      <span v-else class="text-muted">No document uploaded</span>
+                    </div>
 
-    <div v-else class="row g-4">
-      <div v-for="row in kycs" :key="row.id" class="col-12 col-md-6">
-        <div class="card border-0 shadow h-100">
-          <div class="card-header bg-white">
-            <h5 class="mb-0">{{ row.full_name }}</h5>
-          </div>
-          <div class="card-body">
-            <div class="alert alert-info mb-3">
-              <div><i class="fas fa-envelope me-2"></i>{{ row.email }}</div>
-              <div><i class="fas fa-phone me-2"></i>WhatsApp 1: {{ row.contact_number1 }}</div>
-              <div><i class="fas fa-phone me-2"></i>WhatsApp 2: {{ nsGet(row.contact_number2) || '-' }}</div>
-              <div><i class="fas fa-map-marker-alt me-2"></i>{{ row.address }}</div>
-              <div><i class="fab fa-telegram me-2"></i>{{ row.telegram_username || '-' }}</div>
-              <div><i class="fas fa-id-card me-2"></i>{{ String(row.document_type || '').toUpperCase() }}: {{ row.document_number }}</div>
-            </div>
+                    <!-- Verification Status -->
+                    <p class="mb-3">
+                      <span class="badge" :class="kyc.is_verified ? 'bg-success' : 'bg-warning text-dark'">
+                        {{ kyc.is_verified ? 'Verified' : 'Pending Verification' }}
+                      </span>
+                    </p>
 
-            <div class="d-flex flex-wrap gap-2 mb-3">
-              <template v-if="row.document_type === 'nic'">
-                <a v-if="nsGet(row.nic_front)" :href="docUrl(nsGet(row.nic_front))" target="_blank">
-                  <img :src="docUrl(nsGet(row.nic_front))" alt="NIC Front" class="img-thumbnail" style="max-width: 140px;" />
-                </a>
-                <a v-if="nsGet(row.nic_back)" :href="docUrl(nsGet(row.nic_back))" target="_blank">
-                  <img :src="docUrl(nsGet(row.nic_back))" alt="NIC Back" class="img-thumbnail" style="max-width: 140px;" />
-                </a>
-              </template>
-              <a v-else-if="row.document_type === 'passport' && nsGet(row.passport_image)" :href="docUrl(nsGet(row.passport_image))" target="_blank">
-                <img :src="docUrl(nsGet(row.passport_image))" alt="Passport" class="img-thumbnail" style="max-width: 140px;" />
-              </a>
-              <span v-if="!nsGet(row.nic_front) && !nsGet(row.nic_back) && !nsGet(row.passport_image)" class="text-muted">No document</span>
-            </div>
-
-            <span class="badge mb-3" :class="row.is_verified ? 'bg-success' : 'bg-warning text-dark'">
-              {{ row.is_verified ? 'Verified' : 'Pending Verification' }}
-            </span>
-
-            <div v-if="!row.is_verified" class="d-flex gap-2">
-              <router-link :to="{ name: 'kyc.edit', params: { id: row.id } }" class="btn btn-primary btn-sm">Edit</router-link>
-              <button type="button" class="btn btn-danger btn-sm" @click="deleteKyc(row)">Delete</button>
-            </div>
-            <p v-else class="text-muted mb-0">Already Verified</p>
-
-            <div v-if="row.is_verified" class="card border-0 bg-light mt-3">
-              <div class="card-body">
-                <h6 class="mb-2"><i class="fab fa-telegram me-2 text-primary"></i>Telegrame Join Link</h6>
-                <div class="alert alert-danger py-2 small mb-2">
-                  Do not share your Telegram group/channel links publicly. These links are for your
-                  personal use only — sharing them outside your account may result in account
-                  suspension per our community policy.
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2 mt-auto">
+                      <template v-if="auth.role !== 'company'">
+                        <template v-if="!kyc.is_verified">
+                          <RouterLink :to="{ name: 'kyc.edit', params: { id: kyc.id } }" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit">
+                            <i class="fas fa-edit"></i>
+                          </RouterLink>
+                          <form @submit.prevent="destroy(kyc)">
+                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Delete">
+                              <i class="fas fa-trash"></i>
+                            </button>
+                          </form>
+                        </template>
+                        <span v-else class="text-success small">Already Verified</span>
+                      </template>
+                      <template v-else>
+                        <form v-if="!kyc.is_verified" @submit.prevent="setVerified(kyc, true)">
+                          <button type="submit" class="btn btn-sm btn-success" data-bs-toggle="tooltip" title="Verify">
+                            <i class="fas fa-check-circle"></i>
+                          </button>
+                        </form>
+                        <form v-else @submit.prevent="setVerified(kyc, false)">
+                          <button type="submit" class="btn btn-sm btn-warning text-white" data-bs-toggle="tooltip" title="Unverify">
+                            <i class="fas fa-times-circle"></i>
+                          </button>
+                        </form>
+                      </template>
+                    </div>
+                  </div>
                 </div>
-                <p class="small text-muted mb-0">
-                  Package-specific Telegram join links aren't available from this build yet — contact
-                  support for your invite link.
-                </p>
               </div>
             </div>
+
+            <div class="col-md-6">
+              <div v-if="kyc.is_verified" class="card border-0">
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <i class="fab fa-telegram me-1"></i> Telegrame Join Link
+                  </h5>
+                  <div class="alert alert-danger d-flex align-items-start" role="alert">
+                    <i class="fas fa-exclamation-triangle fa-lg me-2 mt-1"></i>
+                    <div>
+                      <strong>Important Warning:</strong> For your safety and to maintain the integrity of our platform,
+                      <u>do not share your Telegram link (e.g., <code>t.me/username</code>) anywhere in the system</u>, including in your profile, KYC
+                      form, or chat.
+
+                      <br /><br />
+
+                      Sharing direct Telegram links can lead to:
+                      <ul class="mb-1 mt-1">
+                        <li>Phishing or scam activities through unsolicited contact</li>
+                        <li>Violation of our platform’s security and anti-spam policy</li>
+                        <li>Increased risk of identity fraud or impersonation</li>
+                      </ul>
+
+                      <strong
+                        >📌 If you are found sharing your Telegram link or using the platform to promote external channels, your account will be
+                        <span class="text-uppercase text-info">immediately suspended without notice</span>.</strong
+                      >
+                      This action is irreversible, and no appeals will be accepted.
+
+                      <br /><br />
+                      We are committed to keeping all users safe. Please use the system responsibly.
+                    </div>
+                  </div>
+                  <p class="card-text">
+                    <a v-for="(link, i) in telegramLinks" :key="i" :href="'https://t.me/' + link" target="_blank" class="btn btn-primary">
+                      <i class="fab fa-telegram"></i> Join Telegram
+                    </a>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div v-if="kycs && !rows().length" class="col-12">
+            <div v-if="auth.role !== 'company'" class="text-center my-4">
+              <p class="text-muted">You have not submitted your KYC yet.</p>
+              <RouterLink :to="{ name: 'kyc.create' }" class="btn btn-success">Submit KYC</RouterLink>
+            </div>
+            <div v-else class="alert alert-info">No KYC records found.</div>
           </div>
         </div>
       </div>

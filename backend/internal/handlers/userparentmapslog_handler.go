@@ -46,12 +46,17 @@ func userParentLogsIndexHandler(d *app.Deps) http.HandlerFunc {
 			UserName   models.NullString `db:"user_name"`
 			UserEmail  models.NullString `db:"user_email"`
 			UserStatus models.NullString `db:"user_status"`
+			// "Activation Arrived User": User::where('id', $log->parent_id)->first()
+			ParentUserID models.NullInt64  `db:"parent_user_id"`
+			ParentName   models.NullString `db:"parent_name"`
 		}
 		var rows []logRow
 		_ = d.DB.Select(&rows, `
-			SELECT l.*, u.name AS user_name, u.email AS user_email, u.status AS user_status
+			SELECT l.*, u.name AS user_name, u.email AS user_email, u.status AS user_status,
+			       pu.id AS parent_user_id, pu.name AS parent_name
 			FROM user_parent_map_logs l
 			JOIN users u ON u.id = l.user_id
+			LEFT JOIN users pu ON pu.id = l.parent_id
 			WHERE u.status = 'pending' AND l.created_at <= ?
 			ORDER BY l.created_at DESC
 			LIMIT ? OFFSET ?`, cutoff, perPage, offset)
@@ -68,6 +73,13 @@ func userParentLogsIndexHandler(d *app.Deps) http.HandlerFunc {
 					"status":    row.UserStatus.String,
 				}
 			}
+			var parentOut interface{}
+			if row.ParentUserID.Valid {
+				parentOut = map[string]interface{}{
+					"id":   row.ParentUserID.Int64,
+					"name": row.ParentName.String,
+				}
+			}
 			logs = append(logs, map[string]interface{}{
 				"id":              row.ID,
 				"user_id":         row.UserID,
@@ -76,6 +88,7 @@ func userParentLogsIndexHandler(d *app.Deps) http.HandlerFunc {
 				"note":            row.Note.String,
 				"created_at":      row.CreatedAt,
 				"user":            userOut,
+				"parent_user":     parentOut,
 			})
 		}
 

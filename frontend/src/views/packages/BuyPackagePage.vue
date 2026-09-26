@@ -12,6 +12,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/client'
+import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import AuthCardLayout from '@/components/layout/AuthCardLayout.vue'
 import FlashAlert from '@/components/shared/FlashAlert.vue'
 import { useApiAction } from '@/composables/useApiAction'
@@ -57,18 +58,21 @@ onMounted(fetchPackages)
 </script>
 
 <template>
-  <AuthCardLayout :show-back-link="false">
-    <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
-
-    <form @submit.prevent="submit">
-      <div class="form-group">
-        <label for="package">Choose your package</label>
-        <select id="package" v-model="selectedPackage" class="form-control" required>
-          <option value="">Select Package</option>
-          <option v-for="pkg in packages" :key="pkg.id" :value="pkg.id">{{ pkg.name }} USD</option>
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary mt-4" :disabled="submitting || loading">Next</button>
-    </form>
-  </AuthCardLayout>
+  <!-- buy-package.blade.php renders its card inside the app shell (sidebar + topbar). -->
+  <DashboardLayout>
+    <AuthCardLayout :show-back-link="false">
+      <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
+      <form method="POST" @submit.prevent="submit">
+        <div class="form-group">
+          <label for="package">Choose your package</label>
+          <select v-model="selectedPackage" name="package" class="form-control" required>
+            <option value="">Select Package</option>
+            <option v-for="pack in packages" :key="pack.id" :value="pack.id">{{ pack.name }} USD</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary mt-4" :disabled="submitting || loading">Next</button>
+      </form>
+      <div class="form-group"></div>
+    </AuthCardLayout>
+  </DashboardLayout>
 </template>

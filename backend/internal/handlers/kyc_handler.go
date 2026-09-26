@@ -35,8 +35,10 @@ func RegisterKycRoutes(r chi.Router, d *app.Deps) {
 	r.Group(func(r chi.Router) {
 		r.Use(d.Auth.RequireAuth) // deliberately required on every route below — see file header
 
-		r.Get("/api/v1/kyc", kycIndexHandler(d))
-		r.Get("/api/v1/kyc/show", kycIndexHandler(d)) // kyc.show mirrors kyc.index's logic exactly, per api_spec.md
+		r.Get("/api/v1/kyc", kycIndexHandler(d, false))
+		// kyc.show is kyc.index plus, for non-company users, their active
+		// packages' Telegram links (KycController@show).
+		r.Get("/api/v1/kyc/show", kycIndexHandler(d, true))
 		r.Get("/api/v1/kyc/create", kycCreateHandler(d))
 		r.Get("/api/v1/kyc/{id}/edit", kycEditHandler(d))
 		r.Post("/api/v1/kyc", kycStoreHandler(d))
@@ -58,7 +60,13 @@ func RegisterKycRoutes(r chi.Router, d *app.Deps) {
 // If the logged-in user's role != 'company': fetch their own single Kyc
 // row (0 or 1 of them). Else (role == 'company'): paginated list of
 // unverified KYCs belonging to non-company users.
-func kycIndexHandler(d *app.Deps) http.HandlerFunc {
+// kycAlert is the page-load SweetAlert the original raises with
+// Alert::info/success/warning(title, text).
+func kycAlert(icon, title, text string) map[string]string {
+	return map[string]string{"icon": icon, "title": title, "text": text}
+}
+
+func kycIndexHandler(d *app.Deps, withTelegramLinks bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.UserFromContext(r.Context())
 
@@ -66,15 +74,35 @@ func kycIndexHandler(d *app.Deps) http.HandlerFunc {
 			var kycs []models.Kyc
 			_ = d.DB.Select(&kycs, "SELECT * FROM kycs WHERE user_id = ? LIMIT 1", user.ID)
 
-			alert, message := "info", "No KYC submitted yet."
+			alert := kycAlert("info", "Info", "You have not submitted KYC yet.")
 			if len(kycs) == 1 {
 				if kycs[0].IsVerified {
-					alert, message = "success", "Your KYC is verified."
+					alert = kycAlert("success", "Verified", "Your KYC is verified.")
 				} else {
-					alert, message = "warning", "Your KYC is pending verification."
+					alert = kycAlert("warning", "Pending", "Your KYC is not yet verified.")
 				}
 			}
-			httpx.OK(w, map[string]interface{}{"status": "success", "alert": alert, "message": message, "kycs": kycs})
+			out := map[string]interface{}{"status": "success", "alert": alert, "kycs": kycs}
+			if withTelegramLinks {
+				// One "Join Telegram" button per ACTIVE user package:
+				// $userPackage->userpackage->telegram_link ?? 'N/A'.
+				var links []models.NullString
+				_ = d.DB.Select(&links, `
+					SELECT p.telegram_link FROM user_packages up
+					LEFT JOIN packages p ON p.id = CAST(up.package AS UNSIGNED)
+					WHERE up.user_id = ? AND up.status = 'active'
+					ORDER BY up.id`, user.ID)
+				telegramLinks := make([]string, 0, len(links))
+				for _, l := range links {
+					if l.Valid {
+						telegramLinks = append(telegramLinks, l.String)
+					} else {
+						telegramLinks = append(telegramLinks, "N/A")
+					}
+				}
+				out["telegram_links"] = telegramLinks
+			}
+			httpx.OK(w, out)
 			return
 		}
 
@@ -87,9 +115,13 @@ func kycIndexHandler(d *app.Deps) http.HandlerFunc {
 		_ = d.DB.Select(&kycs, `
 			SELECT k.* FROM kycs k JOIN users u ON u.id = k.user_id
 			WHERE k.is_verified = 0 AND u.role != 'company'
-			ORDER BY k.id DESC LIMIT ? OFFSET ?`, perPage, offset)
+			ORDER BY k.id LIMIT ? OFFSET ?`, perPage, offset)
 
-		httpx.OK(w, map[string]interface{}{"status": "success", "kycs": httpx.Paginate(kycs, total, page, perPage)})
+		alert := kycAlert("success", "Success", "KYC records retrieved successfully.")
+		if total == 0 {
+			alert = kycAlert("info", "Info", "No KYC records found.")
+		}
+		httpx.OK(w, map[string]interface{}{"status": "success", "alert": alert, "kycs": httpx.Paginate(kycs, total, page, perPage)})
 	}
 }
 
@@ -105,9 +137,13 @@ func kycVerifiedHandler(d *app.Deps) http.HandlerFunc {
 		_ = d.DB.Select(&kycs, `
 			SELECT k.* FROM kycs k JOIN users u ON u.id = k.user_id
 			WHERE k.is_verified = 1 AND u.role != 'company'
-			ORDER BY k.id DESC LIMIT ? OFFSET ?`, perPage, offset)
+			ORDER BY k.id LIMIT ? OFFSET ?`, perPage, offset)
 
-		httpx.OK(w, map[string]interface{}{"status": "success", "kycs": httpx.Paginate(kycs, total, page, perPage)})
+		alert := kycAlert("success", "Success", "KYC records retrieved successfully.")
+		if total == 0 {
+			alert = kycAlert("info", "Info", "No KYC records found.")
+		}
+		httpx.OK(w, map[string]interface{}{"status": "success", "alert": alert, "kycs": httpx.Paginate(kycs, total, page, perPage)})
 	}
 }
 

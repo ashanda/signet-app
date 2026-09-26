@@ -1,0 +1,305 @@
+/* ==========================================================================
+   Signet dashboard layer — robotic HUD + motion
+   Applies ONLY to pages whose <body> carries .sg-dashboard (the four
+   dashboards). Builds on signet-ui.css; appearance only, no behaviour.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Ambient HUD frame (injected by signet-dashboard.js)
+   -------------------------------------------------------------------------- */
+.sg-hud{position:fixed;inset:10px;z-index:3;pointer-events:none}
+.sg-hud i{position:absolute;width:22px;height:22px;border:1px solid rgba(0,240,255,.5);animation:sg-hud-in 1s .4s cubic-bezier(.2,.7,.2,1) backwards}
+.sg-hud i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0}
+.sg-hud i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0}
+.sg-hud i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0}
+.sg-hud i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0}
+@keyframes sg-hud-in{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@media (min-width:992px){.sg-hud{left:270px}}
+
+/* --------------------------------------------------------------------------
+   2. Top bar readout
+   -------------------------------------------------------------------------- */
+body.sg-dashboard .navbar-top > .container-fluid > .d-flex > .d-flex:first-child{gap:1rem}
+.sg-clock{
+  font:500 11px/1 var(--sg-font-mono);letter-spacing:.18em;color:var(--sg-accent-light);
+  padding:.4rem .7rem;border:1px solid rgba(0,240,255,.25);border-radius:8px;background:rgba(0,240,255,.05);
+  font-variant-numeric:tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   3. Sidebar
+   -------------------------------------------------------------------------- */
+body.sg-dashboard .sidebar .nav-item{animation:sg-nav .55s cubic-bezier(.2,.7,.2,1) backwards}
+body.sg-dashboard .sidebar .nav-item:nth-child(2){animation-delay:.04s}
+body.sg-dashboard .sidebar .nav-item:nth-child(3){animation-delay:.08s}
+body.sg-dashboard .sidebar .nav-item:nth-child(4){animation-delay:.12s}
+body.sg-dashboard .sidebar .nav-item:nth-child(5){animation-delay:.16s}
+body.sg-dashboard .sidebar .nav-item:nth-child(6){animation-delay:.2s}
+body.sg-dashboard .sidebar .nav-item:nth-child(7){animation-delay:.24s}
+body.sg-dashboard .sidebar .nav-item:nth-child(8){animation-delay:.28s}
+body.sg-dashboard .sidebar .nav-item:nth-child(n+9){animation-delay:.32s}
+@keyframes sg-nav{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+
+body.sg-dashboard .sidebar::after{
+  width:2px;opacity:.9;
+  background:linear-gradient(180deg,transparent 0,rgba(0,240,255,.95) 14%,transparent 30%,transparent 100%);
+  background-size:100% 320%;animation:sg-rail 6s linear infinite;
+}
+@keyframes sg-rail{from{background-position:0 -320%}to{background-position:0 120%}}
+body.sg-dashboard .sidebar .nav-item.active > .nav-link{animation:sg-glow-pulse 3.2s ease-in-out infinite}
+@keyframes sg-glow-pulse{0%,100%{box-shadow:0 0 30px -12px rgba(0,240,255,.5)}50%{box-shadow:0 0 34px -4px rgba(0,240,255,.85)}}
+body.sg-dashboard .sidebar .nav-link:hover .sidebar-icon{transform:scale(1.15);transition:transform .2s}
+
+/* --------------------------------------------------------------------------
+   4. Boot sequence: blocks scan in from the top, with a brief flicker
+   -------------------------------------------------------------------------- */
+body.sg-dashboard .content > .row > [class*="col"],
+body.sg-dashboard .content > .py-4,
+body.sg-dashboard .content > .card{animation:sg-boot .85s cubic-bezier(.2,.7,.2,1) backwards}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(2){animation-delay:.08s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(3){animation-delay:.16s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(4){animation-delay:.24s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(5){animation-delay:.32s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(n+6){animation-delay:.4s}
+@keyframes sg-boot{
+  0%{opacity:0;transform:translateY(10px);clip-path:inset(0 0 100% 0)}
+  35%{opacity:.85;clip-path:inset(0 0 45% 0)}
+  50%{opacity:.35}
+  65%{opacity:1}
+  100%{opacity:1;transform:none;clip-path:inset(-80px)}
+}
+
+/* --------------------------------------------------------------------------
+   5. Cards: cursor spotlight, edge scanner, bigger animated brackets
+   -------------------------------------------------------------------------- */
+body.sg-dashboard .card{
+  background-image:
+    linear-gradient(90deg,transparent,rgba(0,240,255,.9),transparent),
+    radial-gradient(360px circle at var(--mx,-999px) var(--my,-999px),rgba(0,240,255,.10),transparent 45%),
+    var(--sg-card-bg);
+  background-repeat:no-repeat;
+  background-size:38% 1px,100% 100%,100% 100%;
+  background-position:-40% 0,0 0,0 0;
+  animation:sg-edge 7s linear infinite;
+}
+@keyframes sg-edge{
+  0%{background-position:-40% 0,0 0,0 0}
+  55%,100%{background-position:140% 0,0 0,0 0}
+}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(2) .card{animation-delay:.8s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(3) .card{animation-delay:1.6s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(4) .card{animation-delay:2.4s}
+body.sg-dashboard .content > .row > [class*="col"]:nth-child(n+5) .card{animation-delay:3.2s}
+
+body.sg-dashboard .card::before,body.sg-dashboard .card::after{
+  width:16px;height:16px;border-color:rgba(0,240,255,.6);opacity:.8;
+  animation:sg-bracket .9s .35s cubic-bezier(.2,.7,.2,1) backwards;
+}
+@keyframes sg-bracket{from{width:0;height:0;opacity:0}}
+body.sg-dashboard .card:hover{border-color:rgba(0,240,255,.4);box-shadow:0 0 44px -16px rgba(0,240,255,.55),var(--sg-shadow)!important}
+
+/* welcome banner: slow light sweep + one-time glitch on the heading */
+body.sg-dashboard .card.bg-yellow-100{
+  background:
+    linear-gradient(110deg,transparent 42%,rgba(0,240,255,.13) 50%,transparent 58%) 0 0/250% 100% no-repeat,
+    linear-gradient(135deg,rgba(0,240,255,.10),rgba(10,124,255,.06) 55%,rgba(255,255,255,.02))!important;
+  animation:sg-sweep 6.5s ease-in-out infinite;
+}
+@keyframes sg-sweep{0%,20%{background-position:150% 0,0 0}80%,100%{background-position:-50% 0,0 0}}
+body.sg-dashboard .card.bg-yellow-100 h2{animation:sg-glitch .9s .5s steps(1,end) 1 backwards}
+body.sg-dashboard .card.bg-yellow-100 h2:hover{animation:sg-glitch .7s steps(1,end) 1}
+@keyframes sg-glitch{
+  0%{opacity:0}
+  10%{opacity:1;transform:translateX(-3px);text-shadow:3px 0 rgba(255,107,129,.8),-3px 0 rgba(0,240,255,.8)}
+  20%{transform:translateX(3px);text-shadow:-3px 0 rgba(255,107,129,.8),3px 0 rgba(0,240,255,.8)}
+  30%{transform:none;text-shadow:none}
+  45%{transform:translateX(-2px);text-shadow:2px 0 rgba(0,240,255,.8)}
+  55%,100%{transform:none;text-shadow:none}
+}
+
+/* --------------------------------------------------------------------------
+   6. Stat blocks: radar icons + glowing readouts
+   -------------------------------------------------------------------------- */
+body.sg-dashboard .icon-shape{
+  --ic-rgb:0,240,255;
+  position:relative;overflow:visible;width:3.4rem;height:3.4rem;border-radius:16px;
+  color:rgb(var(--ic-rgb));
+  background:radial-gradient(120% 120% at 22% 14%,rgba(var(--ic-rgb),.30),rgba(var(--ic-rgb),.07) 58%,rgba(255,255,255,.02));
+  border:1px solid rgba(var(--ic-rgb),.42);
+  box-shadow:inset 0 0 18px rgba(var(--ic-rgb),.16),0 0 28px -10px rgba(var(--ic-rgb),.75);
+}
+body.sg-dashboard .icon-shape-secondary{--ic-rgb:77,163,255}
+body.sg-dashboard .icon-shape-tertiary{--ic-rgb:61,230,168}
+body.sg-dashboard .icon-shape[data-kind="token"]{--ic-rgb:0,240,255}
+body.sg-dashboard .icon-shape[data-kind="wallet"]{--ic-rgb:77,163,255}
+body.sg-dashboard .icon-shape[data-kind="director"]{--ic-rgb:245,194,107}
+body.sg-dashboard .icon-shape[data-kind="earn"]{--ic-rgb:61,230,168}
+body.sg-dashboard .icon-shape[data-kind="pool"]{--ic-rgb:143,233,245}
+body.sg-dashboard .icon-shape[data-kind="share"]{--ic-rgb:111,168,255}
+body.sg-dashboard .icon-shape[data-kind="portion"]{--ic-rgb:61,230,168}
+/* comet ring orbiting the icon */
+body.sg-dashboard .icon-shape::before{
+  content:'';position:absolute;inset:-7px;border-radius:50%;pointer-events:none;padding:1.5px;
+  background:conic-gradient(from 0deg,rgba(var(--ic-rgb),.95),rgba(var(--ic-rgb),0) 32%,rgba(var(--ic-rgb),0));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  animation:sg-spin 4.5s linear infinite;
+}
+/* glass highlight */
+body.sg-dashboard .icon-shape::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(155deg,rgba(255,255,255,.16),rgba(255,255,255,0) 45%);
+}
+@keyframes sg-spin{to{transform:rotate(360deg)}}
+body.sg-dashboard .icon-shape svg{
+  position:relative;z-index:1;width:1.7rem;height:1.7rem;
+  filter:drop-shadow(0 0 8px rgba(var(--ic-rgb),.6));
+  animation:sg-icon-float 4s ease-in-out infinite;
+}
+@keyframes sg-icon-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+
+body.sg-dashboard .card-body h3.fw-extrabold{
+  text-shadow:0 0 24px rgba(0,240,255,.35);font-variant-numeric:tabular-nums;
+}
+body.sg-dashboard .card-body h3.fw-extrabold .text-success{text-shadow:none;font-family:var(--sg-font-mono);font-size:.55em!important;letter-spacing:.1em}
+
+/* status LEDs on badges */
+body.sg-dashboard .badge.bg-success::before,
+body.sg-dashboard .badge.bg-danger::before,
+body.sg-dashboard .badge.bg-warning::before,
+body.sg-dashboard .badge.bg-info::before{
+  content:'';display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:.5em;vertical-align:middle;
+  background:currentColor;box-shadow:0 0 8px currentColor;animation:sg-blink 2.4s ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------------
+   7. Tables: rows boot in, hover locks on with a cyan marker
+   -------------------------------------------------------------------------- */
+body.sg-dashboard .table tbody tr{animation:sg-row .5s cubic-bezier(.2,.7,.2,1) backwards}
+body.sg-dashboard .table tbody tr:nth-child(2){animation-delay:.05s}
+body.sg-dashboard .table tbody tr:nth-child(3){animation-delay:.1s}
+body.sg-dashboard .table tbody tr:nth-child(4){animation-delay:.15s}
+body.sg-dashboard .table tbody tr:nth-child(5){animation-delay:.2s}
+body.sg-dashboard .table tbody tr:nth-child(6){animation-delay:.25s}
+body.sg-dashboard .table tbody tr:nth-child(7){animation-delay:.3s}
+body.sg-dashboard .table tbody tr:nth-child(8){animation-delay:.35s}
+body.sg-dashboard .table tbody tr:nth-child(n+9){animation-delay:.4s}
+@keyframes sg-row{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+body.sg-dashboard .table tbody tr:hover > td:first-child{box-shadow:inset 3px 0 0 var(--sg-accent),inset 24px 0 30px -24px rgba(0,240,255,.35)}
+body.sg-dashboard .table thead th{background-image:linear-gradient(90deg,transparent,rgba(0,240,255,.5),transparent);background-repeat:no-repeat;background-size:30% 1px;background-position:-40% 100%;animation:sg-th 5s linear infinite}
+@keyframes sg-th{0%{background-position:-40% 100%}60%,100%{background-position:140% 100%}}
+body.sg-dashboard .btn.active-package{animation:sg-btn-pulse 3.4s ease-in-out infinite}
+@keyframes sg-btn-pulse{0%,100%{box-shadow:0 10px 28px -12px rgba(0,240,255,.6)}50%{box-shadow:0 10px 34px -6px rgba(0,240,255,.95)}}
+
+/* --------------------------------------------------------------------------
+   7a. Mining card: cartoon miner + coin burst scene (motion is driven by signet-dashboard.js)
+   -------------------------------------------------------------------------- */
+.sg-mine{
+  position:relative;height:272px;margin:0 0 1.5rem;border-radius:16px;overflow:hidden;
+  border:1px solid rgba(0,240,255,.2);
+  background:
+    radial-gradient(55% 80% at 60% 105%,rgba(245,179,64,.13),transparent 70%),
+    radial-gradient(120% 140% at 25% 100%,rgba(10,124,255,.14),transparent 60%),
+    linear-gradient(180deg,#05090d,#080e14);
+  box-shadow:inset 0 0 40px -12px rgba(0,240,255,.22);
+}
+.sg-mine__bg{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+  background-size:24px 24px;
+  -webkit-mask-image:linear-gradient(180deg,transparent,#000 70%);mask-image:linear-gradient(180deg,transparent,#000 70%);
+}
+.sg-mine__svg{position:absolute;left:50%;top:0;transform:translateX(-50%);width:100%;max-width:720px;height:272px;overflow:visible}
+.sg-mine__fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+
+.sg-mine__label{
+  position:absolute;left:14px;top:12px;z-index:2;display:flex;align-items:center;gap:.55rem;
+  font:500 10px/1 var(--sg-font-mono);letter-spacing:.2em;color:var(--sg-accent-light);
+  padding:.45rem .65rem;border:1px solid rgba(0,240,255,.25);border-radius:8px;background:rgba(0,240,255,.06);
+}
+.sg-mine__label b{display:block;width:6px;height:6px;border-radius:50%;background:#FF6B81;box-shadow:0 0 8px currentColor;color:#FF6B81}
+.sg-mine.is-active .sg-mine__label b{background:#3DE6A8;color:#3DE6A8;animation:sg-blink 1s ease-in-out infinite}
+
+.sg-mine__gauge{position:absolute;right:16px;top:12px;bottom:12px;width:6px;z-index:2}
+.sg-mine__gauge span{position:relative;display:block;height:100%;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.sg-mine__gauge i{
+  position:absolute;left:0;right:0;top:0;height:calc(var(--p,0) * 1%);border-radius:6px;
+  background:linear-gradient(180deg,#00F0FF,#0A7CFF);box-shadow:0 0 12px rgba(0,240,255,.85);transition:height .8s ease;
+}
+.sg-mine__gauge em{
+  position:absolute;right:14px;top:0;font:500 9px/1 var(--sg-font-mono);letter-spacing:.22em;font-style:normal;
+  color:var(--sg-muted-2);writing-mode:vertical-rl;
+}
+
+/* numbers, status and progress inside the mining card */
+.sg-mining .row.text-center h6.text-muted{font:500 11px/1.4 var(--sg-font-mono);letter-spacing:.14em;text-transform:uppercase}
+.sg-mining #miningToken,.sg-mining #totalToken,.sg-mining #dailyMining{
+  font-family:var(--sg-font-mono)!important;font-weight:500;font-size:1.75rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+}
+.sg-mining #miningToken{color:#3DE6A8!important;text-shadow:0 0 22px rgba(61,230,168,.4)}
+.sg-mining #totalToken{color:#8FE9F5!important;text-shadow:0 0 22px rgba(143,233,245,.35)}
+.sg-mining #dailyMining{color:#00F0FF!important;text-shadow:0 0 22px rgba(0,240,255,.4)}
+.sg-mining .sg-tick{animation:sg-tick .7s ease-out}
+@keyframes sg-tick{0%{filter:brightness(1.7)}100%{filter:none}}
+.sg-mining #statusBadge{font-size:.95rem;padding:.55em 1.1em;letter-spacing:.14em}
+.sg-mining #progressPercent{font-family:var(--sg-font-mono);color:var(--sg-accent-light)}
+
+.sg-mining .progress{
+  height:22px!important;border-radius:999px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(0,240,255,.22);box-shadow:inset 0 0 14px rgba(0,0,0,.6);
+}
+.sg-mining #progressBar{
+  position:relative;border-radius:999px;
+  background:
+    repeating-linear-gradient(-45deg,rgba(255,255,255,.24) 0 8px,rgba(255,255,255,0) 8px 16px),
+    linear-gradient(90deg,#00F0FF,#0A7CFF)!important;
+  background-size:32px 32px,100% 100%!important;
+  box-shadow:0 0 18px rgba(0,240,255,.55);
+  animation:sg-stripes 1.1s linear infinite;
+}
+.sg-mining #progressBar::after{
+  content:'';position:absolute;right:3px;top:50%;width:9px;height:9px;border-radius:2px;
+  transform:translateY(-50%) rotate(45deg);background:#fff;box-shadow:0 0 14px 4px rgba(0,240,255,.9);
+}
+@keyframes sg-stripes{to{background-position:32px 0,0 0}}
+
+@media (max-width:575.98px){
+  .sg-mine,.sg-mine__svg{height:218px}
+  .sg-mine__gauge em{display:none}
+}
+
+/* --------------------------------------------------------------------------
+   7b. Tablet / small laptop: two stat cards per row, icon beside its readout
+   -------------------------------------------------------------------------- */
+@media (min-width:576px) and (max-width:1199.98px){
+  body.sg-dashboard .content > .row > [class*="col-xl-4"]{flex:0 0 auto;width:50%}
+  body.sg-dashboard .card-body > .row.d-block{
+    display:flex!important;flex-wrap:nowrap;align-items:center;gap:1.1rem;margin:0;
+  }
+  body.sg-dashboard .card-body > .row.d-block > [class*="col-"]{
+    width:auto;max-width:none;flex:0 0 auto;margin:0;padding:0;
+  }
+  body.sg-dashboard .card-body > .row.d-block > [class*="col-"]:last-child{flex:1 1 auto;min-width:0}
+}
+
+/* --------------------------------------------------------------------------
+   8. Responsive + motion preferences
+   -------------------------------------------------------------------------- */
+@media (max-width:767.98px){
+  .sg-hud{inset:6px}
+  .sg-hud i{width:14px;height:14px}
+  body.sg-dashboard .card{animation:none;background-image:var(--sg-card-bg)}
+  body.sg-dashboard .card.bg-yellow-100{animation:none}
+  body.sg-dashboard .table thead th{animation:none}
+  .sg-clock{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  body.sg-dashboard .card,
+  body.sg-dashboard .icon-shape::before,
+  body.sg-dashboard .icon-shape::after,
+  body.sg-dashboard .icon-shape svg,
+  body.sg-dashboard .sidebar::after,
+  body.sg-dashboard .table thead th{animation:none!important}
+}

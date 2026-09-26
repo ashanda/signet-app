@@ -342,7 +342,7 @@ async function onSubmit() {
                 </div>
               </div>
 
-              <form @submit.prevent="onSubmit" novalidate class="px-4 px-md-5 pb-4 pb-md-5">
+              <form method="POST" class="px-4 px-md-5 pb-4 pb-md-5" @submit.prevent="onSubmit">
                 <FlashAlert type="danger" :message="formError" @close="formError = ''" />
 
                 <div class="bg-light rounded-3 mb-4">
@@ -437,7 +437,6 @@ async function onSubmit() {
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-lg w-100 rounded-3 fw-semibold py-3" :disabled="submitting">
-                  <span v-if="submitting" class="spinner-border spinner-border-sm me-2"></span>
                   Continue to Step 2
                 </button>
               </form>

@@ -35,7 +35,7 @@ func RegisterLeaderExecutiveRoutes(r chi.Router, d *app.Deps) {
 // ('active','deactivate') — that literal spelling (the enum value really is
 // 'deactivate', see schema.md, not 'deactive' as used elsewhere for tokens)
 // — sale='first', created_at within [from 00:00:00, to 23:59:59].
-func leaderExecCodeGainQuery(d *app.Deps, r *http.Request, codeColumn string) (interface{}, string, string) {
+func leaderExecCodeGainQuery(d *app.Deps, r *http.Request, codeColumn string) (interface{}, []map[string]interface{}, string, string) {
 	defaultFrom, defaultTo := reportsCurrentMonthBounds()
 	from := r.URL.Query().Get("from")
 	if from == "" {
@@ -60,6 +60,23 @@ func leaderExecCodeGainQuery(d *app.Deps, r *http.Request, codeColumn string) (i
 		}
 	}
 
+	// The filter dropdown: every user referenced by someone's code column
+	// (same membership rule as the report), ordered by name.
+	var options []map[string]interface{}
+	if optRows, err := d.DB.Queryx("SELECT u.id, u.name FROM users u WHERE " + membershipFilter + " ORDER BY u.name"); err == nil {
+		for optRows.Next() {
+			var id uint64
+			var name string
+			if optRows.Scan(&id, &name) == nil {
+				options = append(options, map[string]interface{}{"id": id, "name": name})
+			}
+		}
+		optRows.Close()
+	}
+	if options == nil {
+		options = []map[string]interface{}{}
+	}
+
 	page, perPage, offset := httpx.PageParams(r, 10)
 
 	var total int
@@ -69,7 +86,7 @@ func leaderExecCodeGainQuery(d *app.Deps, r *http.Request, codeColumn string) (i
 	listArgs = append(listArgs, perPage, offset)
 
 	rows, err := d.DB.Queryx(`
-		SELECT u.id, u.name, u.email,
+		SELECT u.id, u.name, u.email, u.binance_pay_id,
 			(SELECT COALESCE(SUM(p.price),0)
 			 FROM user_packages up
 			 JOIN users m ON m.id = up.user_id
@@ -85,7 +102,7 @@ func leaderExecCodeGainQuery(d *app.Deps, r *http.Request, codeColumn string) (i
 		ORDER BY u.name
 		LIMIT ? OFFSET ?`, listArgs...)
 	if err != nil {
-		return nil, from, to
+		return nil, options, from, to
 	}
 	defer rows.Close()
 
@@ -93,38 +110,39 @@ func leaderExecCodeGainQuery(d *app.Deps, r *http.Request, codeColumn string) (i
 	for rows.Next() {
 		var id uint64
 		var name, email string
+		var binancePayID models.NullString
 		var totalPackage float64
 		var totalMembers int
-		if err := rows.Scan(&id, &name, &email, &totalPackage, &totalMembers); err != nil {
+		if err := rows.Scan(&id, &name, &email, &binancePayID, &totalPackage, &totalMembers); err != nil {
 			continue
 		}
 		out = append(out, map[string]interface{}{
-			"id": id, "name": name, "email": email,
+			"id": id, "name": name, "email": email, "binance_pay_id": binancePayID,
 			"total_package": totalPackage, "total_members": totalMembers,
 		})
 	}
-	return httpx.Paginate(out, total, page, perPage), from, to
+	return httpx.Paginate(out, total, page, perPage), options, from, to
 }
 
 func leadersGainHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		paginated, from, to := leaderExecCodeGainQuery(d, r, "leader_code")
+		paginated, options, from, to := leaderExecCodeGainQuery(d, r, "leader_code")
 		if paginated == nil {
 			httpx.Error(w, http.StatusInternalServerError, "Database error")
 			return
 		}
-		httpx.OK(w, map[string]interface{}{"status": "success", "leaders": paginated, "from": from, "to": to})
+		httpx.OK(w, map[string]interface{}{"status": "success", "leaders": paginated, "leader_options": options, "from": from, "to": to})
 	}
 }
 
 func executivesGainHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		paginated, from, to := leaderExecCodeGainQuery(d, r, "executive_code")
+		paginated, options, from, to := leaderExecCodeGainQuery(d, r, "executive_code")
 		if paginated == nil {
 			httpx.Error(w, http.StatusInternalServerError, "Database error")
 			return
 		}
-		httpx.OK(w, map[string]interface{}{"status": "success", "executives": paginated, "from": from, "to": to})
+		httpx.OK(w, map[string]interface{}{"status": "success", "executives": paginated, "executive_options": options, "from": from, "to": to})
 	}
 }
 

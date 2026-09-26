@@ -5,43 +5,29 @@
 // /company/new-active-package (NOT /active-package — that's Pending
 // Activations' endpoint), per useActivePackage's documented parameter.
 //
-// NOTE: dashActivationRow's user_name/user_whatsapp/package_name fields are
-// sql.NullString scanned straight into the JSON response (no `.String`
-// flatten in the handler), so they arrive as {String,Valid} objects, not
-// plain strings — nullStr() below unwraps that.
+// dashActivationRow's user_name/user_whatsapp/package_name may be null
+// (LEFT JOINs); nullStr() (utils/format.js) renders those as "".
 import { ref, onMounted } from 'vue'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import Paginator from '@/components/shared/Paginator.vue'
 import FlashAlert from '@/components/shared/FlashAlert.vue'
 import { useActivePackage } from '@/composables/useActivePackage'
+import { nullStr } from '@/utils/format'
 
 const { activate } = useActivePackage('/company/new-active-package')
 
 const activations = ref(null)
-const loading = ref(true)
 const loadError = ref('')
 
-function nullStr(v) {
-  return v && typeof v === 'object' && v.Valid ? v.String : ''
-}
-
 async function fetchList(page = 1) {
-  loading.value = true
   loadError.value = ''
   try {
     const { data } = await api.get('/company/new-activations', { params: { page } })
     activations.value = data.activations
   } catch (err) {
-    loadError.value = err?.response?.data?.message || 'Could not load new activations.'
-  } finally {
-    loading.value = false
+    loadError.value = err?.response?.data?.message || 'Could not load activations.'
   }
-}
-
-async function onActive(row) {
-  const ok = await activate(row.id)
-  if (ok) fetchList(activations.value?.current_page || 1)
 }
 
 onMounted(() => fetchList())
@@ -52,9 +38,12 @@ onMounted(() => fetchList())
     <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
 
     <div class="py-4">
-      <h1 class="h4">New Packages/TopUp Activations</h1>
+      <div class="d-flex justify-content-between w-100 flex-wrap">
+        <div class="mb-3 mb-lg-0">
+          <h1 class="h4">New Packages/TopUp Activations</h1>
+        </div>
+      </div>
     </div>
-
     <div class="card border-0 shadow mb-4">
       <div class="card-body">
         <div class="table-responsive">
@@ -68,17 +57,12 @@ onMounted(() => fetchList())
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!loading && !activations?.data?.length">
-                <td colspan="4" class="text-center text-muted py-4">No new activations found</td>
-              </tr>
               <tr v-for="row in activations?.data" :key="row.id">
                 <td>{{ nullStr(row.user_name) || 'Unknown User' }}</td>
                 <td>{{ nullStr(row.user_whatsapp) }}</td>
                 <td>{{ nullStr(row.package_name) || 'Unknown Package' }}</td>
                 <td>
-                  <button type="button" class="btn btn-primary active-package" @click="onActive(row)">
-                    Active
-                  </button>
+                  <button class="btn btn-primary active-package" @click="activate(row.id)">Active</button>
                 </td>
               </tr>
             </tbody>

@@ -187,8 +187,21 @@ func buyPackageHistoryHandler(d *app.Deps) http.HandlerFunc {
 		var total int
 		_ = d.DB.Get(&total, "SELECT COUNT(*) FROM user_packages WHERE user_id = ?", user.ID)
 
-		var packages []models.UserPackage
-		_ = d.DB.Select(&packages, "SELECT * FROM user_packages WHERE user_id = ? ORDER BY id DESC LIMIT ? OFFSET ?", user.ID, perPage, offset)
+		// PackageController@buyPackageHistory: UserPackage::where(user_id)
+		// ->paginate(10) — no explicit order — and the view shows
+		// $package->userpackage->name (the joined package's name).
+		type historyRow struct {
+			models.UserPackage
+			PackageName models.NullString `db:"package_name" json:"package_name"`
+		}
+		var packages []historyRow
+		_ = d.DB.Select(&packages, `
+			SELECT up.*, p.name AS package_name
+			FROM user_packages up
+			LEFT JOIN packages p ON p.id = CAST(up.package AS UNSIGNED)
+			WHERE up.user_id = ?
+			ORDER BY up.id
+			LIMIT ? OFFSET ?`, user.ID, perPage, offset)
 
 		var activePackage models.UserPackage
 		var activePackagePtr interface{}

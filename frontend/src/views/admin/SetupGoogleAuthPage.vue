@@ -3,10 +3,9 @@
 // (route('setup.google.auth', $userId)). See google_auth_handler.go's
 // setupGoogleAuthHandler: GET /admin/{userId}/setup-google-auth regenerates
 // (overwrites) the target user's secret on every call and returns
-// {status, secret, otpauth_url} — QR rendering is left to the frontend, so
-// the otpauth:// URL is rendered client-side with the `qrcode` package. If
-// that ever fails (e.g. offline/blocked), fall back to showing just the
-// secret key with a manual-entry note rather than a broken image.
+// {status, secret, otpauth_url} — QR rendering is left to the frontend: the
+// otpauth:// URL is rendered here as the same 300px SVG data URI the
+// original builds with BaconQrCode (RendererStyle(300), default margin 4).
 import { ref, watch, onMounted } from 'vue'
 import QRCode from 'qrcode'
 import api from '@/api/client'
@@ -22,23 +21,18 @@ const loadError = ref('')
 const secret = ref('')
 const otpauthUrl = ref('')
 const qrDataUrl = ref('')
-const qrFailed = ref(false)
 
 async function load() {
   loading.value = true
   loadError.value = ''
   qrDataUrl.value = ''
-  qrFailed.value = false
   try {
     const { data } = await api.get(`/admin/${props.userId}/setup-google-auth`)
     if (data.status === 'success') {
       secret.value = data.secret
       otpauthUrl.value = data.otpauth_url
-      try {
-        qrDataUrl.value = await QRCode.toDataURL(data.otpauth_url, { width: 260, margin: 1 })
-      } catch {
-        qrFailed.value = true
-      }
+      const svg = await QRCode.toString(data.otpauth_url, { type: 'svg', width: 300, margin: 4 })
+      qrDataUrl.value = 'data:image/svg+xml;base64,' + btoa(svg)
     } else {
       loadError.value = data.message || 'Could not set up Google Authenticator.'
     }
@@ -55,26 +49,13 @@ watch(() => props.userId, load)
 
 <template>
   <DashboardLayout>
-    <div class="text-center mx-auto" style="max-width: 420px;">
-      <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
-
-      <template v-if="!loading && !loadError">
-        <h2 class="h3 mb-3">Setup Google Authenticator</h2>
-        <p class="text-muted">Scan the QR code below with your Google Authenticator app.</p>
-
-        <img
-          v-if="qrDataUrl"
-          :src="qrDataUrl"
-          alt="Google Authenticator QR code"
-          class="img-fluid mb-3"
-        />
-        <div v-else-if="qrFailed" class="alert alert-warning">
-          Scan is unavailable, enter this key manually.
-        </div>
-
-        <p class="mb-1"><strong>Secret Key:</strong> {{ secret }}</p>
-        <p class="text-muted small">Use this key if you cannot scan the QR code.</p>
-      </template>
+    <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
+    <div v-if="!loading && !loadError" class="container text-center">
+      <h2>Setup Google Authenticator</h2>
+      <p>Scan the QR code below with your Google Authenticator app.</p>
+      <img :src="qrDataUrl" alt="Google Authenticator QR Code" class="img-fluid" />
+      <p><strong>Secret Key:</strong> {{ secret }}</p>
+      <p>Use this key if you cannot scan the QR code.</p>
     </div>
   </DashboardLayout>
 </template>

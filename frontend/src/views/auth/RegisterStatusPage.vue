@@ -44,26 +44,16 @@ const statusMessage = computed(() => {
 </script>
 
 <template>
-  <AuthCardLayout max-width="500px" back-text="Back to log in" back-to="/login">
+  <AuthCardLayout back-text="Back to log in" back-to="/login" back-placement="row">
     <h1 class="h3 mb-4">Step 4: Account Status</h1>
-
-    <div v-if="loading" class="text-center text-muted py-4">Loading&hellip;</div>
-
     <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
-
     <template v-if="!loading && !loadError">
       <p>{{ statusMessage }}</p>
       <p>We'll notify you when your account has been activated.</p>
-
       <div class="alert alert-info">
         Your current status: <strong>{{ status }}</strong>
       </div>
-
-      <button type="button" class="btn btn-outline-secondary btn-sm mb-3" @click="fetchStatus">
-        <i class="fas fa-sync-alt me-1"></i>Refresh status
-      </button>
     </template>
-
-    <RouterLink to="/login" class="btn btn-primary d-block">Go to Login</RouterLink>
+    <RouterLink to="/login" class="btn btn-primary">Go to Login</RouterLink>
   </AuthCardLayout>
 </template>

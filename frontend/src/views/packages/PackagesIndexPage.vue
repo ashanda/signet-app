@@ -1,66 +1,57 @@
 <script setup>
 // Ports packages/index.blade.php ("Package List"). See package_handler.go's
-// packageIndexHandler/packageDestroyHandler.
-//
-// Deviations:
-//  - GET /packages returns a plain array (`packages`), not a paginated
-//    envelope — matches the Go handler exactly (no Paginator here).
-//  - Status badge: Active = bg-success (green), Deactive = bg-secondary
-//    (gray) — per ui_spec.md's badge table, NOT bg-danger.
-//  - Delete uses useAlert().confirmDanger() (SweetAlert2) instead of the
-//    original's native confirm(), per FRONTEND_CONVENTIONS.md's approved
-//    consistency deviation.
+// packageIndexHandler/packageDestroyHandler. GET /packages returns a plain
+// array (no pagination), as the original's Package::all(). Delete asks with
+// the browser's confirm(); create/update/delete land here with the
+// original's success flash.
 import { ref, onMounted } from 'vue'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
-import FlashAlert from '@/components/shared/FlashAlert.vue'
-import { useApiAction } from '@/composables/useApiAction'
-import { useAlert } from '@/composables/useToast'
+import { useFlashStore } from '@/store/flash'
+import { nullStr } from '@/utils/format'
 
-const { run } = useApiAction()
-const { confirmDanger } = useAlert()
+const flashStore = useFlashStore()
+const { success } = flashStore.take()
 
-const loading = ref(true)
-const loadError = ref('')
-const flashMessage = ref('')
+const flashSuccess = ref(success)
+const flashError = ref('')
 const packages = ref([])
 
 async function fetchData() {
-  loading.value = true
-  loadError.value = ''
   try {
     const { data } = await api.get('/packages')
     packages.value = data.packages || []
   } catch (err) {
-    loadError.value = err?.response?.data?.message || 'Could not load packages.'
-  } finally {
-    loading.value = false
+    flashError.value = err?.response?.data?.message || 'Could not load packages.'
   }
 }
 
 async function deletePackage(pkg) {
-  const result = await confirmDanger('Are you sure?', 'This package will be deleted permanently.')
-  if (!result.isConfirmed) return
-  const { ok, data } = await run(() => api.delete(`/packages/${pkg.id}`), {
-    successMessage: 'Package deleted successfully.',
-  })
-  if (ok) {
-    flashMessage.value = data?.message || 'Package deleted successfully.'
+  if (!window.confirm('Delete this package?')) return
+  flashSuccess.value = ''
+  flashError.value = ''
+  try {
+    const { data } = await api.delete(`/packages/${pkg.id}`)
+    flashSuccess.value = data?.message || 'Package deleted successfully.'
     fetchData()
+  } catch (err) {
+    flashError.value = err?.response?.data?.message || 'Something went wrong'
   }
 }
 
-onMounted(() => fetchData())
+const ucfirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '')
+
+onMounted(fetchData)
 </script>
 
 <template>
   <DashboardLayout>
-    <FlashAlert type="success" :message="flashMessage" @close="flashMessage = ''" />
-    <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
-
     <div class="container">
       <h3 class="mb-4">Package List</h3>
-      <router-link :to="{ name: 'packages.create' }" class="btn btn-primary mb-3">Add New Package</router-link>
+      <RouterLink :to="{ name: 'packages.create' }" class="btn btn-primary mb-3">Add New Package</RouterLink>
+
+      <div v-if="flashSuccess" class="alert alert-success">{{ flashSuccess }}</div>
+      <div v-if="flashError" class="alert alert-danger">{{ flashError }}</div>
 
       <table class="table table-bordered">
         <thead>
@@ -75,25 +66,22 @@ onMounted(() => fetchData())
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!loading && !packages.length">
-            <td colspan="7" class="text-center text-muted py-4">No packages found</td>
-          </tr>
-          <tr v-for="(row, idx) in packages" :key="row.id">
-            <td>{{ idx + 1 }}</td>
-            <td>{{ row.name }}</td>
-            <td>{{ row.price }}</td>
-            <td>{{ row.commission }}</td>
+          <tr v-for="(pkg, key) in packages" :key="pkg.id">
+            <td>{{ key + 1 }}</td>
+            <td>{{ pkg.name }}</td>
+            <td>{{ pkg.price }}</td>
+            <td>{{ pkg.commission }}</td>
             <td>
-              <span class="badge" :class="row.status === 'active' ? 'bg-success' : 'bg-secondary'">
-                {{ row.status === 'active' ? 'Active' : 'Deactive' }}
+              <span class="badge" :class="'bg-' + (pkg.status === 'active' ? 'success' : 'secondary')">
+                {{ ucfirst(pkg.status) }}
               </span>
             </td>
-            <td>{{ row.rank?.String ?? row.rank ?? '' }}</td>
+            <td>{{ nullStr(pkg.rank) }}</td>
             <td>
-              <router-link :to="{ name: 'packages.edit', params: { id: row.id } }" class="btn btn-sm btn-outline-primary">
-                Edit
-              </router-link>
-              <button type="button" class="btn btn-sm btn-outline-danger" @click="deletePackage(row)">Delete</button>
+              <RouterLink :to="{ name: 'packages.edit', params: { id: pkg.id } }" class="btn btn-sm btn-outline-primary">Edit</RouterLink>
+              <form class="d-inline" @submit.prevent="deletePackage(pkg)">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
             </td>
           </tr>
         </tbody>

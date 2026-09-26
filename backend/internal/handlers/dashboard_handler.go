@@ -397,15 +397,13 @@ func companyDashboardHandler(d *app.Deps) http.HandlerFunc {
 		fromDate := r.URL.Query().Get("from_date")
 		toDate := r.URL.Query().Get("to_date")
 
+		// CompanyController@index only filters when BOTH dates are given
+		// (whereBetween activated_at, startOfDay..endOfDay).
 		where := "up.status = 'active'"
 		var args []interface{}
-		if fromDate != "" {
-			where += " AND up.activated_at >= ?"
-			args = append(args, fromDate+" 00:00:00")
-		}
-		if toDate != "" {
-			where += " AND up.activated_at <= ?"
-			args = append(args, toDate+" 23:59:59")
+		if fromDate != "" && toDate != "" {
+			where += " AND up.activated_at BETWEEN ? AND ?"
+			args = append(args, fromDate+" 00:00:00", toDate+" 23:59:59")
 		}
 
 		type packageWiseRow struct {
@@ -422,7 +420,8 @@ func companyDashboardHandler(d *app.Deps) http.HandlerFunc {
 			FROM user_packages up
 			JOIN packages p ON p.id = CAST(up.package AS UNSIGNED)
 			WHERE ` + where + `
-			GROUP BY p.id, p.name, p.price`
+			GROUP BY p.id, p.name, p.price
+			ORDER BY p.id`
 		_ = d.DB.Select(&packageWiseCounts, query, args...)
 
 		var grandTotal float64
@@ -430,10 +429,16 @@ func companyDashboardHandler(d *app.Deps) http.HandlerFunc {
 			grandTotal += row.TotalValue
 		}
 
+		// company/dashboard.blade.php's "Generate Token" picker lists
+		// AppModelsUser::all() — every user, any role or status.
+		var userIDs []uint64
+		_ = d.DB.Select(&userIDs, "SELECT id FROM users ORDER BY id")
+
 		rankResult, rocResult, allUsersCount, newActivationsCount := dashTreeWidgets(d, user)
 
 		httpx.OK(w, map[string]interface{}{
 			"ref_link":            refLink,
+			"user_ids":            userIDs,
 			"token_counts":        httpx.Paginate(tokenCounts, tokenTotal, page, perPage),
 			"my_tokens":           myTokens,
 			"my_wallet":           myWallet,

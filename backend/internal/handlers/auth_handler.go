@@ -123,6 +123,11 @@ func meHandler(d *app.Deps) http.HandlerFunc {
 				"status":      user.Status,
 				"on_vacation": user.OnVacation,
 				"roc_status":  user.RocStatus.String,
+				// Read by the dashboards' "This Time My Share Portion" card
+				// (auth()->user()->global_director_share_status /
+				// global_director_share in the Blade views).
+				"global_director_share":        user.GlobalDirectorShare,
+				"global_director_share_status": user.GlobalDirectorShareStatus,
 			},
 		})
 	}

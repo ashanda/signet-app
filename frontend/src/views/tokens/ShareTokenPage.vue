@@ -13,16 +13,13 @@
 import { reactive, ref, onMounted } from 'vue'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
-import { useApiAction } from '@/composables/useApiAction'
-
-const { run } = useApiAction()
+import Swal from 'sweetalert2'
 
 const loading = ref(true)
 const loadError = ref('')
 const tokens = ref(0)
 
 const form = reactive({ tokenValue: '', userId: '' })
-const errors = ref({})
 const submitting = ref(false)
 
 async function fetchBalance() {
@@ -38,20 +35,25 @@ async function fetchBalance() {
   }
 }
 
+// Alert::success('Success', ...) / Alert::error('Error', ...) + redirect back.
 async function submit() {
-  errors.value = {}
   submitting.value = true
-  const { ok, error } = await run(
-    () => api.post('/token/share', { tokenValue: Number(form.tokenValue), user_id: Number(form.userId) }),
-    { successMessage: 'Tokens sent successfully!' }
-  )
-  submitting.value = false
-  if (ok) {
-    form.tokenValue = ''
-    form.userId = ''
-    await fetchBalance()
-  } else if (error?.response?.data?.errors) {
-    errors.value = error.response.data.errors
+  try {
+    const { data } = await api.post('/token/share', { tokenValue: Number(form.tokenValue), user_id: Number(form.userId) })
+    if (data.status === 'error') {
+      await Swal.fire({ icon: 'error', title: 'Error', text: data.message })
+    } else {
+      await Swal.fire({ icon: 'success', title: 'Success', text: 'Tokens sent successfully!' })
+      form.tokenValue = ''
+      form.userId = ''
+      await fetchBalance()
+    }
+  } catch (err) {
+    const errs = err?.response?.data?.errors
+    const message = (errs && Object.values(errs)[0]?.[0]) || err?.response?.data?.message || 'Something went wrong'
+    await Swal.fire({ icon: 'error', title: 'Error', text: message })
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -60,47 +62,47 @@ onMounted(fetchBalance)
 
 <template>
   <DashboardLayout>
-    <div class="row justify-content-center">
-      <div class="col-12 col-md-6 col-lg-5">
-        <div v-if="loadError" class="alert alert-danger">{{ loadError }}</div>
-        <div class="card shadow-lg rounded-4">
-          <div class="card-body p-4 p-lg-5">
-            <h1 class="h3 mb-3">Share Token</h1>
-            <p class="mb-4">My Token : {{ tokens }} USDT</p>
-
-            <form @submit.prevent="submit">
-              <div class="mb-3">
-                <label class="form-label">Tokens Value</label>
-                <input
-                  v-model="form.tokenValue"
-                  type="number"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors.tokenValue }"
-                  :max="tokens"
-                  min="1"
-                  required
-                  autofocus
-                />
-                <div v-if="errors.tokenValue" class="invalid-feedback">{{ errors.tokenValue[0] }}</div>
+    <!-- Section -->
+    <section class="vh-lg-100 mt-5 mt-lg-0 bg-soft d-flex align-items-center">
+      <div class="container">
+        <div class="row justify-content-center form-bg-image">
+          <div class="col-12 d-flex align-items-center justify-content-center">
+            <div class="bg-white shadow border-0 rounded border-light p-4 p-lg-5 w-100 fmxw-500">
+              <!-- The original's unterminated "</a" swallows this block's
+                   closing </div>, so the form renders inside the centred
+                   heading block. Kept, since that is what users see. -->
+              <div class="text-center text-md-center mb-4 mt-md-0">
+                <h1 class="mb-0 h3">Share Token</h1>
+                <p>My Token : {{ tokens }} USDT</p>
+                <div v-if="loadError" class="alert alert-danger">{{ loadError }}</div>
+                <form class="mt-4" method="POST" @submit.prevent="submit">
+                  <!-- Form -->
+                  <div class="form-group mb-4">
+                    <label for="text">Tokens Value</label>
+                    <div class="input-group">
+                      <input id="tokenValue" v-model="form.tokenValue" type="number" :max="tokens" min="1" class="form-control" placeholder="10" name="tokenValue" autofocus required />
+                    </div>
+                  </div>
+                  <!-- End of Form -->
+                  <div class="form-group">
+                    <!-- Form -->
+                    <div class="form-group mb-4">
+                      <label for="user_id">User ID</label>
+                      <div class="input-group">
+                        <input id="user_id" v-model="form.userId" type="number" placeholder="User ID" class="form-control" name="user_id" required />
+                      </div>
+                    </div>
+                    <!-- End of Form -->
+                  </div>
+                  <div class="d-grid">
+                    <button type="submit" class="btn btn-gray-800" :disabled="submitting || loading">Send Tokens</button>
+                  </div>
+                </form>
               </div>
-              <div class="mb-4">
-                <label class="form-label">User ID</label>
-                <input
-                  v-model="form.userId"
-                  type="number"
-                  class="form-control"
-                  :class="{ 'is-invalid': errors.user_id }"
-                  required
-                />
-                <div v-if="errors.user_id" class="invalid-feedback">{{ errors.user_id[0] }}</div>
-              </div>
-              <div class="d-grid">
-                <button type="submit" class="btn btn-gray-800" :disabled="submitting || loading">Send Tokens</button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </DashboardLayout>
 </template>

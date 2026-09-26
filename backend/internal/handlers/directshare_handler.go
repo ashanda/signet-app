@@ -98,7 +98,7 @@ func directShareHandler(d *app.Deps) http.HandlerFunc {
 		listArgs := append(append([]interface{}{}, dateArgs...), perPage, offset)
 		rows, err := d.DB.Queryx(`
 			SELECT pp.id, pp.user_id, pp.package_id, pp.pool_amount, pp.created_at,
-			       u.name AS user_name, p.name AS package_name
+			       u.name AS user_name, p.name AS package_name, p.price AS package_price
 			FROM package_pools pp
 			LEFT JOIN users u ON u.id = pp.user_id
 			LEFT JOIN packages p ON p.id = pp.package_id
@@ -116,12 +116,15 @@ func directShareHandler(d *app.Deps) http.HandlerFunc {
 			var poolAmount float64
 			var createdAt models.NullTime
 			var userName, packageName models.NullString
-			if err := rows.Scan(&id, &userID, &packageID, &poolAmount, &createdAt, &userName, &packageName); err != nil {
+			var packagePrice models.NullInt64
+			if err := rows.Scan(&id, &userID, &packageID, &poolAmount, &createdAt, &userName, &packageName, &packagePrice); err != nil {
 				continue
 			}
 			pools = append(pools, map[string]interface{}{
 				"id": id, "user_id": userID, "package_id": packageID, "pool_amount": poolAmount,
 				"created_at": createdAt.Time, "user_name": userName.String, "package_name": packageName.String,
+				// direct_share.blade.php's "Package Value" column: $pool->package->price ?? 'N/A'
+				"package_price": packagePrice,
 			})
 		}
 
@@ -157,7 +160,7 @@ func directShareLogHandler(d *app.Deps) http.HandlerFunc {
 		_ = d.DB.Get(&total, `SELECT COUNT(*) FROM global_share_wallets_log WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?`, startDate, endDate)
 
 		rows, err := d.DB.Queryx(`
-			SELECT gswl.id, gswl.user_id, gswl.amount, gswl.description, gswl.created_at, u.name AS user_name
+			SELECT gswl.id, gswl.user_id, gswl.amount, gswl.description, gswl.created_at, u.name AS user_name, u.binance_pay_id
 			FROM global_share_wallets_log gswl
 			LEFT JOIN users u ON u.id = CAST(gswl.user_id AS UNSIGNED)
 			WHERE DATE(gswl.created_at) >= ? AND DATE(gswl.created_at) <= ?
@@ -174,13 +177,13 @@ func directShareLogHandler(d *app.Deps) http.HandlerFunc {
 			var userID, amount string
 			var description models.NullString
 			var createdAt models.NullTime
-			var userName models.NullString
-			if err := rows.Scan(&id, &userID, &amount, &description, &createdAt, &userName); err != nil {
+			var userName, binancePayID models.NullString
+			if err := rows.Scan(&id, &userID, &amount, &description, &createdAt, &userName, &binancePayID); err != nil {
 				continue
 			}
 			pools = append(pools, map[string]interface{}{
 				"id": id, "user_id": userID, "amount": amount, "description": description.String,
-				"created_at": createdAt.Time, "user_name": userName.String,
+				"created_at": createdAt.Time, "user_name": userName.String, "binance_pay_id": binancePayID.String,
 			})
 		}
 

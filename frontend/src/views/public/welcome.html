@@ -1,0 +1,649 @@
+<!-- Generated from crypto-app resources/views/welcome.blade.php (<body> markup, Blade helpers resolved). -->
+
+<div class="bg-grid" aria-hidden="true"></div>
+
+<!-- ================= NAV ================= -->
+<header class="nav" id="site-nav">
+  <nav class="nav__inner">
+    <a href="#top" class="nav__brand">
+      <img src="/resources/site/assets/logo/signet-mark.png" alt="Signet" width="30" height="30">
+      <span>Signet</span>
+    </a>
+
+    <div class="nav__links">
+      <a href="#top" class="nav__link is-home">Home</a>
+      <a href="#about" class="nav__link">About</a>
+      <a href="#services" class="nav__link">Services</a>
+      <a href="#how" class="nav__link">How It Works</a>
+      <a href="#faq" class="nav__link">FAQ</a>
+      <a href="#contact" class="nav__link">Contact</a>
+    </div>
+    <div class="nav__actions">
+      <a href="/login" class="nav__login">Login</a>
+      <a href="/register" class="btn btn--gradient nav__cta">Get Started</a>
+    </div>
+
+    <button class="nav__toggle" id="menu-toggle" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </nav>
+</header>
+
+<div class="mobile-menu" id="mobile-menu">
+  <div class="mobile-menu__head">
+    <img src="/resources/site/assets/logo/signet-light.png" alt="Signet">
+    <button class="mobile-menu__close" id="menu-close" aria-label="Close menu">×</button>
+  </div>
+  <div class="mobile-menu__links">
+    <a href="#top" class="js-close-menu">Home</a>
+    <a href="#about" class="js-close-menu">About</a>
+    <a href="#services" class="js-close-menu">Services</a>
+    <a href="#how" class="js-close-menu">How It Works</a>
+    <a href="#faq" class="js-close-menu">FAQ</a>
+    <a href="#contact" class="js-close-menu">Contact</a>
+  </div>
+  <div class="mobile-menu__foot">
+    <a href="/register" class="btn btn--gradient">Get Started</a>
+    <a href="/login" class="btn btn--outline">Login</a>
+  </div>
+</div>
+
+<!-- ================= HERO ================= -->
+<section id="top" class="section hero">
+  <div class="hero__glow" aria-hidden="true"></div>
+  <div class="hero__grid">
+    <div>
+      <div class="badge" data-hero="1">
+        <span class="badge__dot"></span>
+        <span class="badge__text">THE NEXT GENERATION OF DIGITAL FINANCE</span>
+      </div>
+      <h1 class="hero__title" data-hero="2">Trade Smarter.<br><span class="gradient">Build Your Digital Future.</span></h1>
+      <p class="hero__lead" data-hero="3">Signet is an institutional-grade digital-asset platform — market intelligence, portfolio tooling and a curated cryptocurrency ecosystem, engineered in one professional workspace.</p>
+      <div class="hero__ctas" data-hero="4">
+        <a href="/register" class="btn btn--gradient btn--primary">Get Started</a>
+        <a href="#trading" class="btn--outline">Explore Platform</a>
+        <a href="#about" class="link-more">Learn More →</a>
+      </div>
+      <div class="hero__stats" data-hero="5">
+        <div>
+          <div class="stat__value"><span data-count="180" data-dec="0">0</span>+</div>
+          <div class="stat__label">Digital assets</div>
+        </div>
+        <div>
+          <div class="stat__value">$<span data-count="4.2" data-dec="1">0</span>B</div>
+          <div class="stat__label">Monthly volume tracked</div>
+        </div>
+        <div>
+          <div class="stat__value"><span data-count="99.98" data-dec="2">0</span>%</div>
+          <div class="stat__label">Platform uptime</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero__visual" data-hero="6">
+      <canvas id="hero-canvas"></canvas>
+      <div class="hero__visual-glow" aria-hidden="true"></div>
+      <div class="hero__caption">SIGNET CHAIN · BLOCK STREAM<br>VALIDATING · 1,284 NODES</div>
+      <div class="float-card float-card--portfolio" data-parallax="18">
+        <div class="float-card__label">PORTFOLIO</div>
+        <div class="value">$128,940.22</div>
+        <div class="change">▲ 6.42% · 24h</div>
+      </div>
+      <div class="float-card float-card--signal" data-parallax="-24">
+        <div class="float-card__label">SIGNAL · SIG</div>
+        <div class="row">
+          <span class="badge-long">LONG</span>
+          <span class="conf">conf. 0.82</span>
+        </div>
+      </div>
+      <div class="float-card float-card--nodes" data-parallax="12">
+        <span>NODES · 1,284 ONLINE</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TICKER ================= -->
+<div class="ticker">
+  <div class="ticker__track">
+    <div class="ticker__set">
+      <span data-coin="bitcoin">BTC <span class="sym js-price">$68,412.50</span> <span class="up js-pct" data-fmt="sign">+2.41%</span></span>
+      <span data-coin="ethereum">ETH <span class="sym js-price">$3,584.10</span> <span class="up js-pct" data-fmt="sign">+1.86%</span></span>
+      <span data-coin="solana">SOL <span class="sym js-price">$172.33</span> <span class="down js-pct" data-fmt="sign">−0.94%</span></span>
+      <span data-coin="ripple">XRP <span class="sym js-price">$0.6218</span> <span class="up js-pct" data-fmt="sign">+3.12%</span></span>
+      <span data-coin="cardano">ADA <span class="sym js-price">$0.4471</span> <span class="down js-pct" data-fmt="sign">−1.20%</span></span>
+      <span data-coin="avalanche-2">AVAX <span class="sym js-price">$38.07</span> <span class="up js-pct" data-fmt="sign">+4.65%</span></span>
+      <span data-coin="chainlink">LINK <span class="sym js-price">$17.92</span> <span class="up js-pct" data-fmt="sign">+0.78%</span></span>
+      <span data-coin="polkadot">DOT <span class="sym js-price">$7.04</span> <span class="down js-pct" data-fmt="sign">−0.31%</span></span>
+    </div>
+    <div class="ticker__set" aria-hidden="true">
+      <span data-coin="bitcoin">BTC <span class="sym js-price">$68,412.50</span> <span class="up js-pct" data-fmt="sign">+2.41%</span></span>
+      <span data-coin="ethereum">ETH <span class="sym js-price">$3,584.10</span> <span class="up js-pct" data-fmt="sign">+1.86%</span></span>
+      <span data-coin="solana">SOL <span class="sym js-price">$172.33</span> <span class="down js-pct" data-fmt="sign">−0.94%</span></span>
+      <span data-coin="ripple">XRP <span class="sym js-price">$0.6218</span> <span class="up js-pct" data-fmt="sign">+3.12%</span></span>
+      <span data-coin="cardano">ADA <span class="sym js-price">$0.4471</span> <span class="down js-pct" data-fmt="sign">−1.20%</span></span>
+      <span data-coin="avalanche-2">AVAX <span class="sym js-price">$38.07</span> <span class="up js-pct" data-fmt="sign">+4.65%</span></span>
+      <span data-coin="chainlink">LINK <span class="sym js-price">$17.92</span> <span class="up js-pct" data-fmt="sign">+0.78%</span></span>
+      <span data-coin="polkadot">DOT <span class="sym js-price">$7.04</span> <span class="down js-pct" data-fmt="sign">−0.31%</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MARKET ================= -->
+<section id="market" class="section">
+  <div class="wrap">
+    <div class="market__head" data-reveal="1">
+      <div>
+        <div class="eyebrow">01 — MARKETS</div>
+        <h2 class="section-title">Live market intelligence</h2>
+        <p class="section-desc" id="market-note" style="max-width:520px">Representative sample data shown until live prices load.</p>
+      </div>
+      <div class="range-toggle">
+        <button class="is-active" type="button">24h</button>
+        <button type="button">7d</button>
+        <button type="button">30d</button>
+      </div>
+    </div>
+
+    <div class="market-grid">
+      <div class="market-card" data-reveal="1" data-coin="bitcoin">
+        <div class="market-card__head">
+          <span class="coin-icon" style="background:rgba(247,147,26,.14);border:1px solid rgba(247,147,26,.4);color:#F7931A">₿</span>
+          <div>
+            <div class="market-card__name">Bitcoin</div>
+            <div class="market-card__symbol">BTC</div>
+          </div>
+          <span class="pct pct--up js-pct" data-fmt="arrow">▲ 2.41%</span>
+        </div>
+        <div class="market-card__price js-price">$68,412.50</div>
+        <canvas data-spark="34,38,31,44,41,52,48,57,54,63,60,72,69,78" data-up="1" height="56"></canvas>
+      </div>
+
+      <div class="market-card" data-reveal="2" data-coin="ethereum">
+        <div class="market-card__head">
+          <span class="coin-icon" style="background:rgba(140,155,255,.14);border:1px solid rgba(140,155,255,.4);color:#8C9BFF">Ξ</span>
+          <div>
+            <div class="market-card__name">Ethereum</div>
+            <div class="market-card__symbol">ETH</div>
+          </div>
+          <span class="pct pct--up js-pct" data-fmt="arrow">▲ 1.86%</span>
+        </div>
+        <div class="market-card__price js-price">$3,584.10</div>
+        <canvas data-spark="40,44,39,48,52,47,55,58,53,61,66,62,70,74" data-up="1" height="56"></canvas>
+      </div>
+
+      <div class="market-card" data-reveal="3" data-coin="solana">
+        <div class="market-card__head">
+          <span class="coin-icon" style="background:rgba(0,240,255,.12);border:1px solid rgba(0,240,255,.4);color:#00F0FF">◎</span>
+          <div>
+            <div class="market-card__name">Solana</div>
+            <div class="market-card__symbol">SOL</div>
+          </div>
+          <span class="pct pct--down js-pct" data-fmt="arrow">▼ 0.94%</span>
+        </div>
+        <div class="market-card__price js-price">$172.33</div>
+        <canvas data-spark="72,68,74,66,70,61,64,58,60,52,55,48,50,44" data-up="0" height="56"></canvas>
+      </div>
+
+      <div class="market-card" data-reveal="4" data-coin="ripple">
+        <div class="market-card__head">
+          <span class="coin-icon" style="background:rgba(234,246,248,.08);border:1px solid rgba(234,246,248,.26);color:#EAF6F8">✕</span>
+          <div>
+            <div class="market-card__name">XRP</div>
+            <div class="market-card__symbol">XRP</div>
+          </div>
+          <span class="pct pct--up js-pct" data-fmt="arrow">▲ 3.12%</span>
+        </div>
+        <div class="market-card__price js-price">$0.6218</div>
+        <canvas data-spark="30,34,32,40,37,45,43,50,55,52,60,64,61,70" data-up="1" height="56"></canvas>
+      </div>
+
+      <div class="market-card" data-reveal="5" data-coin="avalanche-2">
+        <div class="market-card__head">
+          <span class="coin-icon" style="background:rgba(255,107,129,.12);border:1px solid rgba(255,107,129,.36);color:#FF6B81">▲</span>
+          <div>
+            <div class="market-card__name">Avalanche</div>
+            <div class="market-card__symbol">AVAX</div>
+          </div>
+          <span class="pct pct--up js-pct" data-fmt="arrow">▲ 4.65%</span>
+        </div>
+        <div class="market-card__price js-price">$38.07</div>
+        <canvas data-spark="28,33,30,38,44,40,49,54,50,58,65,62,71,79" data-up="1" height="56"></canvas>
+      </div>
+
+      <div class="market-card" data-reveal="6" data-coin="chainlink">
+        <div class="market-card__head">
+          <span class="coin-icon" style="background:rgba(10,124,255,.14);border:1px solid rgba(10,124,255,.42);color:#5CA8FF">⬡</span>
+          <div>
+            <div class="market-card__name">Chainlink</div>
+            <div class="market-card__symbol">LINK</div>
+          </div>
+          <span class="pct pct--up js-pct" data-fmt="arrow">▲ 0.78%</span>
+        </div>
+        <div class="market-card__price js-price">$17.92</div>
+        <canvas data-spark="44,42,47,45,50,48,52,50,55,53,58,56,61,64" data-up="1" height="56"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABOUT ================= -->
+<section id="about" class="section">
+  <div class="about__grid">
+    <div data-reveal="1">
+      <div class="eyebrow">02 — ABOUT SIGNET</div>
+      <h2 class="section-title">Infrastructure for the digital-asset era</h2>
+      <p class="about__lead">Signet was built by traders and engineers who wanted institutional discipline in a market that rarely offers it. We combine transparent market data, structured research and modern portfolio tooling into a single platform — so decisions are made on information, not noise.</p>
+      <div class="about__stats">
+        <div class="stat-tile">
+          <div class="stat-tile__value"><span data-count="180" data-dec="0">0</span>+</div>
+          <div class="stat-tile__label">Digital assets covered</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile__value"><span data-count="12400" data-dec="0">0</span>+</div>
+          <div class="stat-tile__label">Trading signals published</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile__value"><span data-count="94" data-dec="0">0</span></div>
+          <div class="stat-tile__label">Countries in our community</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile__value"><span data-count="8" data-dec="0">0</span></div>
+          <div class="stat-tile__label">Years of innovation</div>
+        </div>
+      </div>
+    </div>
+    <div class="about__visual" data-reveal="2">
+      <canvas id="orbit-canvas"></canvas>
+      <div class="about__visual-mark">
+        <img src="/resources/site/assets/logo/signet-mark.png" alt="" width="90" height="90">
+      </div>
+      <div class="about__visual-caption">SIGNET DISTRIBUTED LEDGER<br>1,284 NODES · 94 REGIONS</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section id="how" class="section">
+  <div class="wrap">
+    <div class="steps-head" data-reveal="1">
+      <div class="eyebrow">03 — HOW IT WORKS</div>
+      <h2 class="section-title">Four steps to the platform</h2>
+    </div>
+    <div class="steps-wrap">
+      <div class="step-line"></div>
+      <div class="step-line__fill" id="step-line-fill"></div>
+      <div class="steps-grid">
+        <div class="step" data-reveal="1">
+          <div class="step__num">01</div>
+          <h3>Create your account</h3>
+          <p>Register in minutes and complete a straightforward verification flow.</p>
+        </div>
+        <div class="step" data-reveal="2">
+          <div class="step__num">02</div>
+          <h3>Choose your package</h3>
+          <p>Select the package that fits you as part of registration.</p>
+        </div>
+        <div class="step" data-reveal="3">
+          <div class="step__num">03</div>
+          <h3>Access the platform</h3>
+          <p>Open the workspace — market data, research and signal history in one view.</p>
+        </div>
+        <div class="step" data-reveal="4">
+          <div class="step__num">04</div>
+          <h3>Manage your assets</h3>
+          <p>Track allocation, performance and exposure with modern portfolio tooling.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SERVICES ================= -->
+<section id="services" class="section">
+  <div class="services__glow" aria-hidden="true"></div>
+  <div class="wrap" style="position:relative">
+    <div class="steps-head" data-reveal="1">
+      <div class="eyebrow">04 — SERVICES</div>
+      <h2 class="section-title">What the platform delivers</h2>
+    </div>
+    <div class="services-grid">
+      <a href="#trading" class="service-card" data-reveal="1">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><rect x="2" y="20" width="6" height="12" rx="2" fill="#00F0FF" opacity=".5"/><rect x="12" y="12" width="6" height="20" rx="2" fill="#00F0FF" opacity=".75"/><rect x="22" y="4" width="6" height="28" rx="2" fill="#00F0FF"/></svg>
+        <h3>Trading Signals</h3>
+        <p>Professional cryptocurrency market insights with documented entry logic and full history.</p>
+        <span class="service-card__link">Explore →</span>
+      </a>
+      <a href="#market" class="service-card" data-reveal="2">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><circle cx="17" cy="17" r="15" stroke="#00F0FF" stroke-opacity=".45" stroke-width="1.5"/><circle cx="17" cy="17" r="8" stroke="#00F0FF" stroke-width="1.5"/><circle cx="17" cy="17" r="2.5" fill="#00F0FF"/></svg>
+        <h3>Digital Assets</h3>
+        <p>Coverage across 180+ cryptocurrency assets, from majors to emerging networks.</p>
+        <span class="service-card__link">Explore →</span>
+      </a>
+      <a href="#trading" class="service-card" data-reveal="3">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><path d="M2 26 L11 15 L19 21 L32 5" stroke="#00F0FF" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="15" r="3" fill="#00F0FF"/><circle cx="19" cy="21" r="3" fill="#00F0FF" opacity=".6"/></svg>
+        <h3>Market Insights</h3>
+        <p>Data-driven analysis of flows, volatility and structure — published continuously.</p>
+        <span class="service-card__link">Explore →</span>
+      </a>
+      <a href="#trading" class="service-card" data-reveal="4">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><rect x="2" y="2" width="13" height="13" rx="3" fill="#00F0FF"/><rect x="19" y="2" width="13" height="13" rx="3" fill="#00F0FF" opacity=".45"/><rect x="2" y="19" width="13" height="13" rx="3" fill="#00F0FF" opacity=".45"/><rect x="19" y="19" width="13" height="13" rx="3" fill="#00F0FF" opacity=".8"/></svg>
+        <h3>Portfolio Tools</h3>
+        <p>Monitor allocation, performance and risk exposure across every holding.</p>
+        <span class="service-card__link">Explore →</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRADING DASHBOARD ================= -->
+<section id="trading" class="section">
+  <div class="wrap">
+    <div class="trading__intro" data-reveal="1">
+      <div class="eyebrow">05 — THE WORKSPACE</div>
+      <h2 class="section-title">A trading desk, reimagined</h2>
+      <p class="section-desc">Representative interface preview. Figures are illustrative sample data.</p>
+    </div>
+
+    <div class="trading__panel" data-reveal="2">
+      <div class="trading__head">
+        <div style="display:flex;align-items:center;gap:11px">
+          <span class="coin-badge">S</span>
+          <span class="pair">SIGCOIN <span class="quote">· SIG / USD</span></span>
+        </div>
+        <div class="price">$68,412.50</div>
+        <div class="pct pct--up" style="margin-left:0">▲ 2.41%</div>
+        <div class="tf-toggle">
+          <span>15m</span>
+          <span class="is-active">1H</span>
+          <span>4h</span>
+          <span>1D</span>
+        </div>
+      </div>
+
+      <div class="trading__body">
+        <div class="chart-box">
+          <canvas id="candle-canvas"></canvas>
+        </div>
+        <div class="side-panel">
+          <div class="balance-card">
+            <div class="balance-card__label">PORTFOLIO BALANCE</div>
+            <div class="balance-card__value">$128,940.22</div>
+            <div class="alloc-bar">
+              <span style="flex:5;background:var(--accent)"></span>
+              <span style="flex:3;background:#5CA8FF"></span>
+              <span style="flex:2;background:#3DE6A8"></span>
+              <span style="flex:1.2;background:rgba(255,255,255,.18)"></span>
+            </div>
+            <div class="alloc-legend">
+              <span>SIG 48%</span><span>ETH 27%</span><span>SOL 17%</span><span>OTHER 8%</span>
+            </div>
+          </div>
+          <div class="trade-actions">
+            <button class="btn-buy" type="button">Buy</button>
+            <button class="btn-sell" type="button">Sell</button>
+          </div>
+          <div class="stats-list">
+            <div><span>24h High</span><span>$69,180.00</span></div>
+            <div><span>24h Low</span><span>$66,742.30</span></div>
+            <div><span>24h Volume</span><span>$28.4B</span></div>
+            <div><span>Market Cap</span><span>$1.34T</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRUST / SECURITY ================= -->
+<section id="trust" class="section">
+  <div class="wrap">
+    <div class="trust__intro" data-reveal="1">
+      <div class="eyebrow">06 — TRUST &amp; SECURITY</div>
+      <h2 class="section-title">Security is the product</h2>
+      <p class="section-desc">Layered infrastructure, explicit disclosure and account controls you can audit yourself.</p>
+    </div>
+    <div class="trust__grid">
+      <div class="trust-card" data-reveal="1">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><rect x="4" y="4" width="22" height="22" rx="6" stroke="#00F0FF" stroke-width="1.5"/><circle cx="15" cy="15" r="4" fill="#00F0FF"/></svg>
+        <h3>Secure Infrastructure</h3>
+        <p>Segregated environments, continuous monitoring and independent review cycles.</p>
+      </div>
+      <div class="trust-card" data-reveal="2">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><rect x="6" y="13" width="18" height="13" rx="4" stroke="#00F0FF" stroke-width="1.5"/><path d="M10 13V9a5 5 0 0 1 10 0v4" stroke="#00F0FF" stroke-width="1.5"/></svg>
+        <h3>Data Protection</h3>
+        <p>Encryption in transit and at rest, with strict internal access boundaries.</p>
+      </div>
+      <div class="trust-card" data-reveal="3">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><circle cx="15" cy="10" r="5" stroke="#00F0FF" stroke-width="1.5"/><path d="M5 26c0-5.5 4.5-8 10-8s10 2.5 10 8" stroke="#00F0FF" stroke-width="1.5"/></svg>
+        <h3>Account Security</h3>
+        <p>Two-factor authentication, device sessions and full activity history.</p>
+      </div>
+      <div class="trust-card" data-reveal="4">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M15 3l11 6v8c0 6-5 9-11 10-6-1-11-4-11-10V9l11-6z" stroke="#00F0FF" stroke-width="1.5"/><path d="M10 15l4 4 6-7" stroke="#00F0FF" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <h3>Transparent Information</h3>
+        <p>Clear methodology and plain-language risk disclosure — no performance promises.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WHY CHOOSE US ================= -->
+<section class="section">
+  <div class="wrap">
+    <div class="steps-head" data-reveal="1">
+      <div class="eyebrow">07 — WHY SIGNET</div>
+      <h2 class="section-title">Built on six principles</h2>
+    </div>
+    <div class="why-grid">
+      <div class="why-tile" data-reveal="1">
+        <div class="why-tile__icon"><span class="dot-sq"></span></div>
+        <h3>Secure</h3>
+        <p>Defense in depth across infrastructure, accounts and internal process.</p>
+      </div>
+      <div class="why-tile" data-reveal="2">
+        <div class="why-tile__icon"><span class="dot-circle"></span></div>
+        <h3>Fast</h3>
+        <p>Sub-second data pipelines so the workspace reflects the market, not yesterday.</p>
+      </div>
+      <div class="why-tile" data-reveal="3">
+        <div class="why-tile__icon"><span class="dot-diamond"></span></div>
+        <h3>Transparent</h3>
+        <p>Every signal keeps its full record — including the calls that did not work.</p>
+      </div>
+      <div class="why-tile" data-reveal="1">
+        <div class="why-tile__icon"><span class="ring-spin"></span></div>
+        <h3>Global</h3>
+        <p>A community across 94 countries, with regional market context built in.</p>
+      </div>
+      <div class="why-tile" data-reveal="2">
+        <div class="why-tile__icon"><span class="ring-spin-sq"></span></div>
+        <h3>Advanced Technology</h3>
+        <p>Modern quantitative models supporting — never replacing — human judgement.</p>
+      </div>
+      <div class="why-tile" data-reveal="3">
+        <div class="why-tile__icon"><span class="dot-drop"></span></div>
+        <h3>User Focused</h3>
+        <p>Interfaces designed for clarity under pressure, on desktop and mobile alike.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ROADMAP ================= -->
+<section id="roadmap" class="section">
+  <div class="wrap">
+    <div class="roadmap-head" data-reveal="1">
+      <div class="eyebrow">08 — ROADMAP</div>
+      <h2 class="section-title">Where Signet goes next</h2>
+    </div>
+    <div class="roadmap-wrap">
+      <div class="roadmap-line"></div>
+      <div class="roadmap-line__fill" id="roadmap-line-fill"></div>
+      <div class="roadmap-list">
+        <div class="roadmap-item" data-reveal="1">
+          <span class="roadmap-item__dot" style="background:var(--accent);box-shadow:0 0 16px var(--accent)"></span>
+          <div class="roadmap-item__head">
+            <span class="roadmap-item__year" style="color:var(--accent)">2026</span>
+            <h3>Platform Evolution</h3>
+          </div>
+          <p>Rebuilt workspace, new signal engine, deeper portfolio analytics and a fully native mobile experience.</p>
+        </div>
+        <div class="roadmap-item" data-reveal="2">
+          <span class="roadmap-item__dot" style="background:#5CA8FF;box-shadow:0 0 16px #5CA8FF"></span>
+          <div class="roadmap-item__head">
+            <span class="roadmap-item__year" style="color:#5CA8FF">2027</span>
+            <h3>Global Expansion</h3>
+          </div>
+          <p>Localised research desks, regional market context and expanded institutional partnerships.</p>
+        </div>
+        <div class="roadmap-item" data-reveal="3">
+          <span class="roadmap-item__dot" style="background:rgba(255,255,255,.4);box-shadow:0 0 14px rgba(255,255,255,.3)"></span>
+          <div class="roadmap-item__head">
+            <span class="roadmap-item__year" style="color:#C3D4DC">2028</span>
+            <h3>Digital Asset Ecosystem</h3>
+          </div>
+          <p>An open platform layer — APIs, integrations and third-party tooling built on Signet data.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section id="faq" class="section">
+  <div class="faq-grid">
+    <div class="faq-intro" data-reveal="1">
+      <div class="eyebrow">09 — FAQ</div>
+      <h2 class="section-title">Questions, answered</h2>
+      <p class="section-desc">Still unsure about something? Our team replies within one business day.</p>
+      <a href="#contact">Contact support →</a>
+    </div>
+    <div class="faq-list" data-reveal="2">
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          <span>What is Signet?</span>
+          <span class="faq-item__icon">+</span>
+        </button>
+        <div class="faq-item__panel">
+          <p>Signet is a digital-asset intelligence platform: market data, research, trading signals and portfolio tooling in one professional workspace. It is an information and tooling service, not a custodian or broker.</p>
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          <span>How does it work?</span>
+          <span class="faq-item__icon">+</span>
+        </button>
+        <div class="faq-item__panel">
+          <p>We aggregate exchange and on-chain data, structure it, and publish analysis and signals with documented reasoning. You decide what to act on — every position and decision remains yours.</p>
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          <span>How do I register?</span>
+          <span class="faq-item__icon">+</span>
+        </button>
+        <div class="faq-item__panel">
+          <p>Select <a href="/register">Get Started</a>, enter your details and choose a package. Your account is then activated by our team.</p>
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          <span>What services are available?</span>
+          <span class="faq-item__icon">+</span>
+        </button>
+        <div class="faq-item__panel">
+          <p>Trading signals, digital-asset coverage, market insights and portfolio tools, all in one workspace.</p>
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          <span>Which cryptocurrencies are supported?</span>
+          <span class="faq-item__icon">+</span>
+        </button>
+        <div class="faq-item__panel">
+          <p>More than 180 assets, including BTC, ETH, SOL, XRP, AVAX and LINK, plus selected emerging networks reviewed by our research team.</p>
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          <span>How can I contact support?</span>
+          <span class="faq-item__icon">+</span>
+        </button>
+        <div class="faq-item__panel">
+          <p>Email Info@Signet.com and our team will get back to you.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= NEWSLETTER ================= -->
+<section id="contact" class="section newsletter">
+  <div class="newsletter__panel" data-reveal="1">
+    <div class="newsletter__glow" aria-hidden="true"></div>
+    <div class="newsletter__grid">
+      <div>
+        <h2>Stay Ahead of the Market</h2>
+        <p>Get the latest platform updates, market insights and digital-finance news.</p>
+      </div>
+      <div>
+        <form class="newsletter__form" id="newsletter-form">
+          <input type="email" placeholder="Enter your email" required>
+          <button type="submit" class="btn btn--gradient">Subscribe</button>
+        </form>
+        <p class="newsletter__fine">No spam. Unsubscribe anytime. Nothing here is financial advice.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer">
+  <img class="footer__mark" src="/resources/site/assets/logo/signet-mark.png" alt="" width="700" height="700">
+  <div class="footer__inner">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <img src="/resources/site/assets/logo/signet-light.png" alt="Signet" width="140" height="50">
+        <p>Institutional-grade intelligence for the digital-asset market. Built for clarity, transparency and long-term decision-making.</p>
+        <div class="social-links">
+          <a href="#contact" class="social-link" aria-label="Facebook">f</a>
+          <a href="#contact" class="social-link" aria-label="X">X</a>
+          <a href="#contact" class="social-link" aria-label="Telegram">tg</a>
+          <a href="#contact" class="social-link" aria-label="Instagram">ig</a>
+          <a href="#contact" class="social-link" aria-label="LinkedIn">in</a>
+        </div>
+      </div>
+      <div class="footer__col">
+        <div class="footer__col-head">PLATFORM</div>
+        <div class="footer__col-links">
+          <a href="#about">About</a>
+          <a href="#services">Services</a>
+          <a href="#how">How It Works</a>
+          <a href="/register">Get Started</a>
+        </div>
+      </div>
+      <div class="footer__col">
+        <div class="footer__col-head">RESOURCES</div>
+        <div class="footer__col-links">
+          <a href="#faq">FAQ</a>
+          <a href="#roadmap">Roadmap</a>
+          <a href="#market">Market</a>
+          <a href="/login">Login</a>
+        </div>
+      </div>
+      <div class="footer__col">
+        <div class="footer__col-head">LEGAL</div>
+        <div class="footer__col-links">
+          <a href="#contact">Privacy Policy</a>
+          <a href="#contact">Terms of Service</a>
+          <a href="#contact">Risk Disclosure</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <div class="footer__copy">© __YEAR__ Signet. All rights reserved.</div>
+      <div class="footer__risk">Digital assets are volatile and carry risk. Signet provides information and tools only — not investment advice, and no return is promised or implied.</div>
+    </div>
+  </div>
+</footer>

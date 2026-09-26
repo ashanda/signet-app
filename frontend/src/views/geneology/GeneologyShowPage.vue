@@ -3,27 +3,19 @@
 // route('geneology.show', $userId)). See geneology_handler.go's
 // viewGeneologyHandler (GET /geneology/{userId}).
 //
-// `user_package` rows are a hand-built map, but `activated_at`/
-// `created_at` are assigned the RAW sql.NullTime value (`p.ActivatedAt`,
-// not `.Time`) — no custom MarshalJSON on that stdlib type, so they may
-// arrive as {Time,Valid} objects; ntGet handles both shapes.
+// "Activated On" shows each package row's created_at, as the original does.
 import { ref, onMounted, watch } from 'vue'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import FlashAlert from '@/components/shared/FlashAlert.vue'
+import { nullTime, numberFormat } from '@/utils/format'
 
 const props = defineProps({
   userId: { type: [String, Number], required: true },
 })
 
-function ntGet(v) {
-  if (v == null) return ''
-  if (typeof v === 'object') return v.Valid ? v.Time : ''
-  return v
-}
-
 function ymd(v) {
-  const t = ntGet(v)
+  const t = nullTime(v)
   return t ? String(t).slice(0, 10) : ''
 }
 
@@ -55,23 +47,23 @@ watch(() => props.userId, fetchData)
 <template>
   <DashboardLayout>
     <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
-
-    <div v-if="userdata" class="card border-0 shadow mb-4">
-      <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">{{ userdata.name }}</h5>
-      </div>
-      <div class="card-body">
-        <h6 class="mb-3">User Information</h6>
-        <div class="table-responsive mb-4">
+    <div v-if="userdata" class="container">
+      <div class="card shadow mt-4">
+        <div class="card-header bg-primary text-white">
+          <h4>{{ userdata.name }}</h4>
+        </div>
+        <div class="card-body">
+          <!-- User Info -->
+          <h5 class="mb-3">User Information</h5>
           <table class="table table-bordered">
             <tbody>
               <tr>
-                <th style="width: 200px;">Name</th>
+                <th>Name</th>
                 <td>{{ userdata.name }}</td>
               </tr>
               <tr>
                 <th>Signet ID</th>
-                <td>{{ userdata.signet_id }}</td>
+                <td>{{ 'SIG-00' + userdata.id }}</td>
               </tr>
               <tr>
                 <th>Email</th>
@@ -83,32 +75,32 @@ watch(() => props.userId, fetchData)
               </tr>
               <tr>
                 <th>Registered At</th>
-                <td>{{ ymd(userdata.created_at) || '—' }}</td>
+                <td>{{ ymd(userdata.created_at) }}</td>
               </tr>
             </tbody>
           </table>
-        </div>
 
-        <h6 class="mb-3">Referred By (Parent)</h6>
-        <div v-if="parentData" class="table-responsive mb-4">
-          <table class="table table-bordered">
-            <tbody>
-              <tr>
-                <th style="width: 200px;">Name</th>
-                <td>{{ parentData.name }}</td>
-              </tr>
-              <tr>
-                <th>Email</th>
-                <td>{{ parentData.email || '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="fst-italic text-muted mb-4">No parent user found.</p>
+          <!-- Parent Info -->
+          <template v-if="parentData">
+            <h5 class="mt-4">Referred By (Parent)</h5>
+            <table class="table table-bordered">
+              <tbody>
+                <tr>
+                  <th>Name</th>
+                  <td>{{ parentData.name }}</td>
+                </tr>
+                <tr>
+                  <th>Email</th>
+                  <td>{{ parentData.email }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+          <p v-else class="text-muted mt-3"><em>No parent user found.</em></p>
 
-        <h6 class="mb-3">User Packages</h6>
-        <div v-if="userPackages.length" class="table-responsive">
-          <table class="table table-bordered table-striped">
+          <!-- Package Info -->
+          <h5 class="mt-4">User Packages</h5>
+          <table v-if="userPackages.length" class="table table-bordered table-striped">
             <thead>
               <tr>
                 <th>#</th>
@@ -118,16 +110,16 @@ watch(() => props.userId, fetchData)
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(pkg, idx) in userPackages" :key="pkg.id">
-                <td>{{ idx + 1 }}</td>
+              <tr v-for="(pkg, key) in userPackages" :key="pkg.id">
+                <td>{{ key + 1 }}</td>
                 <td>{{ pkg.package_name || 'N/A' }}</td>
-                <td>{{ Number(pkg.earn || 0).toFixed(2) }}</td>
-                <td>{{ ymd(pkg.activated_at) || '—' }}</td>
+                <td>{{ numberFormat(pkg.earn, 2) }}</td>
+                <td>{{ ymd(pkg.created_at) }}</td>
               </tr>
             </tbody>
           </table>
+          <p v-else class="text-muted"><em>No packages assigned to this user.</em></p>
         </div>
-        <p v-else class="fst-italic text-muted mb-0">No packages assigned to this user.</p>
       </div>
     </div>
   </DashboardLayout>

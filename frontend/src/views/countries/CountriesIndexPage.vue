@@ -3,175 +3,155 @@
 // countries_handler.go's countriesIndexHandler/countriesStoreHandler/
 // countriesUpdateHandler/countriesDestroyHandler.
 //
-// Deviation from ui_spec.md (an approved, documented one, per
-// FRONTEND_CONVENTIONS.md): the original uses a native browser confirm()
-// for delete; this rebuild uses useAlert().confirmDanger() (SweetAlert2)
-// consistently with the rest of the app.
+// Store/update/destroy redirect back with a success flash in the original;
+// here the list is re-fetched and the same flash shown. Delete asks with the
+// browser's confirm(), as the original does.
 import { ref, onMounted } from 'vue'
 import api from '@/api/client'
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import Paginator from '@/components/shared/Paginator.vue'
-import FlashAlert from '@/components/shared/FlashAlert.vue'
-import { useApiAction } from '@/composables/useApiAction'
-import { useAlert } from '@/composables/useToast'
+import { useBsModal } from '@/composables/useBsModal'
 
-const { run } = useApiAction()
-const { confirmDanger } = useAlert()
+const countryModal = useBsModal()
 
-const loading = ref(true)
-const loadError = ref('')
-const flashMessage = ref('')
-
+const flashSuccess = ref('')
+const flashError = ref('')
 const countries = ref(null)
 
-async function fetchData(page = 1) {
-  loading.value = true
-  loadError.value = ''
+async function fetchData(page = countries.value?.current_page || 1) {
   try {
     const { data } = await api.get('/countries', { params: { page } })
     countries.value = data.countries
   } catch (err) {
-    loadError.value = err?.response?.data?.message || 'Could not load countries.'
-  } finally {
-    loading.value = false
+    flashError.value = err?.response?.data?.message || 'Could not load countries.'
   }
 }
 
-// --- Add/Edit Country modal ---
-const showModal = ref(false)
-const modalMode = ref('add') // 'add' | 'edit'
-const form = ref({ id: '', code: '', name: '' })
-const errors = ref({})
-const saving = ref(false)
+onMounted(() => fetchData(1))
 
-function openAddModal() {
-  modalMode.value = 'add'
+const modalTitle = ref('Add Country')
+const form = ref({ id: '', code: '', name: '' })
+
+function createCountry() {
+  modalTitle.value = 'Add Country'
   form.value = { id: '', code: '', name: '' }
-  errors.value = {}
-  showModal.value = true
 }
 
 function editCountry(country) {
-  modalMode.value = 'edit'
+  modalTitle.value = 'Edit Country'
   form.value = { id: country.id, code: country.code, name: country.name }
-  errors.value = {}
-  showModal.value = true
 }
 
-function closeModal() {
-  showModal.value = false
+async function write(request) {
+  flashSuccess.value = ''
+  flashError.value = ''
+  try {
+    const { data } = await request()
+    if (data?.status === 'error') flashError.value = data.message
+    else flashSuccess.value = data?.message || ''
+    await fetchData()
+    return true
+  } catch (err) {
+    const errs = err?.response?.data?.errors
+    flashError.value = (errs && Object.values(errs)[0]?.[0]) || err?.response?.data?.message || 'Something went wrong'
+    return false
+  }
 }
 
 async function submitForm() {
-  errors.value = {}
-  saving.value = true
   const payload = { code: form.value.code, name: form.value.name }
-  const call =
-    modalMode.value === 'add'
-      ? () => api.post('/countries', payload)
-      : () => api.put(`/countries/${form.value.id}`, payload)
-
-  const { ok, data, error } = await run(call, {
-    successMessage: modalMode.value === 'add' ? 'Country Create Success' : 'Country updated successfully.',
-    showErrorAlert: false,
-  })
-  saving.value = false
-  if (ok) {
-    showModal.value = false
-    flashMessage.value = data?.message || 'Saved.'
-    fetchData(countries.value?.current_page || 1)
-  } else {
-    const respErrors = error?.response?.data?.errors
-    if (respErrors) {
-      errors.value = respErrors
-    } else {
-      errors.value = { _general: [error?.response?.data?.message || 'Could not save country.'] }
-    }
-  }
+  const ok = await write(() => (form.value.id ? api.put(`/countries/${form.value.id}`, payload) : api.post('/countries', payload)))
+  if (ok) countryModal.hide()
 }
 
-async function deleteCountry(country) {
-  const result = await confirmDanger('Are you sure?', 'This country will be deleted permanently.')
-  if (!result.isConfirmed) return
-  const { ok, data } = await run(() => api.delete(`/countries/${country.id}`), {
-    successMessage: 'Country deleted successfully.',
-  })
-  if (ok) {
-    flashMessage.value = data?.message || 'Country deleted successfully.'
-    fetchData(countries.value?.current_page || 1)
-  }
+function deleteCountry(country) {
+  if (!window.confirm('Delete this country?')) return
+  write(() => api.delete(`/countries/${country.id}`))
 }
-
-onMounted(() => fetchData())
 </script>
 
 <template>
   <DashboardLayout>
-    <FlashAlert type="success" :message="flashMessage" @close="flashMessage = ''" />
-    <FlashAlert type="danger" :message="loadError" @close="loadError = ''" />
+    <div class="container">
+      <h3 class="mb-4">Countries List</h3>
 
-    <div class="py-4 d-flex align-items-center justify-content-between">
-      <h3 class="mb-0">Countries List</h3>
-      <button type="button" class="btn btn-primary" @click="openAddModal">Add New Country</button>
-    </div>
+      <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#countryModal" @click="createCountry">
+        Add New Country
+      </button>
 
-    <div class="card border-0 shadow mb-4">
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-bordered table-striped align-middle">
-            <thead class="thead-light">
-              <tr>
-                <th>#</th>
-                <th>Country Code</th>
-                <th>Country Name</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!loading && !countries?.data?.length">
-                <td colspan="4" class="text-center text-muted py-4">No countries found</td>
-              </tr>
-              <tr v-for="(row, idx) in countries?.data" :key="row.id">
-                <td>{{ (countries.from || 1) + idx }}</td>
-                <td>{{ row.code }}</td>
-                <td>{{ row.name }}</td>
-                <td>
-                  <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="editCountry(row)">Edit</button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" @click="deleteCountry(row)">Delete</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <Paginator :pagination="countries" @change="(p) => fetchData(p)" />
+      <div v-if="flashSuccess" class="alert alert-success">
+        {{ flashSuccess }}
       </div>
+      <div v-if="flashError" class="alert alert-danger">
+        {{ flashError }}
+      </div>
+
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Country Code</th>
+            <th>Country Name</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-for="(country, key) in countries?.data" :key="country.id">
+            <td>{{ (countries.from || 1) + key }}</td>
+            <td>{{ country.code }}</td>
+            <td>{{ country.name }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#countryModal" @click="editCountry(country)">
+                Edit
+              </button>
+
+              <form class="d-inline" @submit.prevent="deleteCountry(country)">
+                <button class="btn btn-sm btn-outline-danger">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <Paginator :pagination="countries" @change="(p) => fetchData(p)" />
     </div>
 
-    <!-- Add/Edit Country modal -->
-    <div v-if="showModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+    <!-- Country Modal -->
+    <div id="countryModal" :ref="countryModal.el" class="modal fade" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
-          <form @submit.prevent="submitForm">
+          <form id="countryForm" method="POST" @submit.prevent="submitForm">
             <div class="modal-header">
-              <h5 class="modal-title">{{ modalMode === 'add' ? 'Add Country' : 'Edit Country' }}</h5>
-              <button type="button" class="btn-close" @click="closeModal"></button>
+              <h5 id="modalTitle" class="modal-title">
+                {{ modalTitle }}
+              </h5>
+
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+
             <div class="modal-body">
-              <div v-if="errors._general" class="alert alert-danger py-2">{{ errors._general[0] }}</div>
               <div class="mb-3">
-                <label class="form-label">Country Code</label>
-                <input v-model="form.code" type="text" class="form-control" :class="{ 'is-invalid': errors.code }" required />
-                <div v-if="errors.code" class="invalid-feedback">{{ errors.code[0] }}</div>
+                <label>Country Code</label>
+                <input id="code" v-model="form.code" type="text" name="code" class="form-control" required />
               </div>
+
               <div class="mb-3">
-                <label class="form-label">Country Name</label>
-                <input v-model="form.name" type="text" class="form-control" :class="{ 'is-invalid': errors.name }" required />
-                <div v-if="errors.name" class="invalid-feedback">{{ errors.name[0] }}</div>
+                <label>Country Name</label>
+                <input id="name" v-model="form.name" type="text" name="name" class="form-control" required />
               </div>
             </div>
+
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
-              <button type="submit" class="btn btn-primary" :disabled="saving">Save</button>
+              <button type="submit" class="btn btn-primary">
+                Save
+              </button>
+
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                Close
+              </button>
             </div>
           </form>
         </div>
