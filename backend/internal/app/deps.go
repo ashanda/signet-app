@@ -11,10 +11,12 @@ import (
 
 	"signet-backend/internal/auth"
 	"signet-backend/internal/config"
+	"signet-backend/internal/storage"
 )
 
 type Deps struct {
-	DB   *sqlx.DB
-	Auth *auth.Service
-	Cfg  *config.Config
+	DB      *sqlx.DB
+	Auth    *auth.Service
+	Cfg     *config.Config
+	Storage storage.Store
 }

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"signet-backend/internal/db"
 	"signet-backend/internal/handlers"
 	"signet-backend/internal/jobs"
+	"signet-backend/internal/storage"
 )
 
 func main() {
@@ -27,7 +29,19 @@ func main() {
 	defer conn.Close()
 
 	authSvc := auth.New(conn, cfg.SessionSecret, cfg.SessionLifetime, cfg.AppEnv == "production")
-	deps := &app.Deps{DB: conn, Auth: authSvc, Cfg: cfg}
+	store, err := storage.New(context.Background(), cfg)
+	if err != nil {
+		log.Fatalf("storage: %v", err)
+	}
+	log.Printf("storage: KYC files → %s", store.Name())
+	// Not fatal: a transient S3 problem at boot shouldn't take the whole
+	// API down, but a misconfiguration must be visible in the log.
+	checkCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := storage.Check(checkCtx, store); err != nil {
+		log.Printf("storage: WARNING: %v — KYC uploads will fail until this is fixed", err)
+	}
+	cancel()
+	deps := &app.Deps{DB: conn, Auth: authSvc, Cfg: cfg, Storage: store}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

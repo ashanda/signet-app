@@ -46,6 +46,18 @@ type Config struct {
 	// than one API process against the same database, to avoid duplicate
 	// job runs.
 	EnableScheduler bool
+
+	// StorageDriver selects where uploaded files (KYC images) go: "local"
+	// (default, under StorageLocalRoot) or "s3" (AWSBucket; reads fall back
+	// to StorageLocalRoot for files uploaded before the switch). See
+	// internal/storage. AWS credentials are read by the AWS SDK itself from
+	// AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+	StorageDriver    string
+	StorageLocalRoot string
+	AWSBucket        string
+	AWSRegion        string
+	AWSEndpoint      string // only for S3-compatible stores; empty for AWS
+	AWSUsePathStyle  bool
 }
 
 func env(key, fallback string) string {
@@ -101,6 +113,13 @@ func Load() *Config {
 		FrontendOrigin: env("FRONTEND_ORIGIN", "http://localhost:5173"),
 
 		EnableScheduler: envBool("ENABLE_SCHEDULER", true),
+
+		StorageDriver:    env("STORAGE_DRIVER", "local"),
+		StorageLocalRoot: env("STORAGE_LOCAL_ROOT", "storage"),
+		AWSBucket:        env("AWS_BUCKET", ""),
+		AWSRegion:        env("AWS_DEFAULT_REGION", ""),
+		AWSEndpoint:      env("AWS_ENDPOINT", ""),
+		AWSUsePathStyle:  envBool("AWS_USE_PATH_STYLE_ENDPOINT", false),
 	}
 }
 

@@ -1,0 +1,14 @@
+# /etc/systemd/system/signet-db-backup.service — see docs/S3_SETUP.md
+[Unit]
+Description=Signet database backup to S3
+Wants=network-online.target
+After=network-online.target mysql.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/signet/backend/.env.production
+# /snap/bin in case the AWS CLI was installed with snap.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+ExecStart=/opt/signet/deploy/backup/signet-db-backup.sh
+Nice=10
+IOSchedulingClass=idle

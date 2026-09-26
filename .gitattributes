@@ -1,0 +1,4 @@
+# Server-side scripts and units must keep LF endings even on a Windows checkout.
+*.sh text eol=lf
+*.service text eol=lf
+*.timer text eol=lf

@@ -11,10 +11,12 @@
 package handlers
 
 import (
+	"errors"
 	"io"
+	"log"
 	"net/http"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -23,14 +25,16 @@ import (
 	"signet-backend/internal/auth"
 	"signet-backend/internal/httpx"
 	"signet-backend/internal/models"
+	"signet-backend/internal/storage"
 )
 
 const kycMaxUploadBytes = 20 << 20 // 20MB total multipart form
 
 func RegisterKycRoutes(r chi.Router, d *app.Deps) {
 	// Serves files saved by kycStoreFile below (mirrors the original's
-	// `public` disk under kyc/nic_front, kyc/nic_back, kyc/passport).
-	r.Get("/storage/kyc/*", http.StripPrefix("/storage/kyc/", http.FileServer(http.Dir("./storage/kyc"))).ServeHTTP)
+	// `public` disk under kyc/nic_front, kyc/nic_back, kyc/passport),
+	// from local disk or S3 depending on STORAGE_DRIVER.
+	r.Get("/storage/kyc/*", kycServeFile(d.Storage))
 
 	r.Group(func(r chi.Router) {
 		r.Use(d.Auth.RequireAuth) // deliberately required on every route below — see file header
@@ -230,17 +234,17 @@ func kycStoreHandler(d *app.Deps) http.HandlerFunc {
 			return
 		}
 
-		nicFrontPath, err := kycStoreFile(r, "nic_front", "nic_front")
+		nicFrontPath, err := kycStoreFile(r, d.Storage, "nic_front", "nic_front")
 		if err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Could not store nic_front")
 			return
 		}
-		nicBackPath, err := kycStoreFile(r, "nic_back", "nic_back")
+		nicBackPath, err := kycStoreFile(r, d.Storage, "nic_back", "nic_back")
 		if err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Could not store nic_back")
 			return
 		}
-		passportPath, err := kycStoreFile(r, "passport_image", "passport")
+		passportPath, err := kycStoreFile(r, d.Storage, "passport_image", "passport")
 		if err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Could not store passport_image")
 			return
@@ -321,21 +325,21 @@ func kycUpdateHandler(d *app.Deps) http.HandlerFunc {
 		}
 
 		nicFront := kyc.NicFront
-		if p, err := kycStoreFile(r, "nic_front", "nic_front"); err != nil {
+		if p, err := kycStoreFile(r, d.Storage, "nic_front", "nic_front"); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Could not store nic_front")
 			return
 		} else if p != "" {
 			nicFront = models.NullString{String: p, Valid: true}
 		}
 		nicBack := kyc.NicBack
-		if p, err := kycStoreFile(r, "nic_back", "nic_back"); err != nil {
+		if p, err := kycStoreFile(r, d.Storage, "nic_back", "nic_back"); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Could not store nic_back")
 			return
 		} else if p != "" {
 			nicBack = models.NullString{String: p, Valid: true}
 		}
 		passport := kyc.PassportImage
-		if p, err := kycStoreFile(r, "passport_image", "passport"); err != nil {
+		if p, err := kycStoreFile(r, d.Storage, "passport_image", "passport"); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Could not store passport_image")
 			return
 		} else if p != "" {
@@ -426,10 +430,11 @@ func kycUnverifyHandler(d *app.Deps) http.HandlerFunc {
 }
 
 // kycStoreFile reads an optional uploaded file from the given multipart
-// field and saves it under ./storage/kyc/{subdir}/, returning the relative
-// path (e.g. "kyc/nic_front/<hex>.jpg") to store in the DB. Returns ("",
-// nil) if the field was not present in the request.
-func kycStoreFile(r *http.Request, field, subdir string) (string, error) {
+// field and saves it to the configured store (local ./storage or S3) under
+// kyc/{subdir}/, returning that key (e.g. "kyc/nic_front/<hex>.jpg") to
+// store in the DB. Returns ("", nil) if the field was not present in the
+// request.
+func kycStoreFile(r *http.Request, store storage.Store, field, subdir string) (string, error) {
 	file, header, err := r.FormFile(field)
 	if err != nil {
 		if err == http.ErrMissingFile {
@@ -439,21 +444,74 @@ func kycStoreFile(r *http.Request, field, subdir string) (string, error) {
 	}
 	defer file.Close()
 
-	dir := filepath.Join("storage", "kyc", subdir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// Sniff the real type from the content, not the client's claim, so the
+	// file is served back with a truthful Content-Type.
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(file, head)
+	contentType := http.DetectContentType(head[:n])
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return "", err
 	}
-	ext := filepath.Ext(header.Filename)
-	name := randomHex(16) + ext
-	dst, err := os.Create(filepath.Join(dir, name))
-	if err != nil {
+
+	key := "kyc/" + subdir + "/" + randomHex(16) + kycSafeExt(header.Filename)
+	if err := store.Put(r.Context(), key, file, header.Size, contentType); err != nil {
+		log.Printf("kyc: storing %s in %s failed: %v", key, store.Name(), err)
 		return "", err
 	}
-	defer dst.Close()
-	if _, err := io.Copy(dst, file); err != nil {
-		return "", err
+	return key, nil
+}
+
+// kycSafeExt keeps the client's extension (as the original did) only when
+// it is a short plain alphanumeric one, so a crafted filename can't shape
+// the stored key.
+func kycSafeExt(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if len(ext) < 2 || len(ext) > 6 {
+		return ""
 	}
-	return "kyc/" + subdir + "/" + name, nil
+	for _, c := range ext[1:] {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return ""
+		}
+	}
+	return ext
+}
+
+// kycServeFile serves /storage/kyc/* from the configured store, so S3
+// objects stay private and existing URLs saved in the DB keep working.
+func kycServeFile(store storage.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key, err := storage.CleanKey("kyc/" + chi.URLParam(r, "*"))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		body, info, err := store.Open(r.Context(), key)
+		if errors.Is(err, storage.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			log.Printf("kyc: reading %s from %s failed: %v", key, store.Name(), err)
+			http.Error(w, "could not load file", http.StatusBadGateway)
+			return
+		}
+		defer body.Close()
+
+		if info.ContentType == "" {
+			info.ContentType = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", info.ContentType)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, max-age=3600")
+		if info.Size > 0 {
+			w.Header().Set("Content-Length", strconv.FormatInt(info.Size, 10))
+		}
+		if !info.ModTime.IsZero() {
+			w.Header().Set("Last-Modified", info.ModTime.UTC().Format(http.TimeFormat))
+		}
+		io.Copy(w, body)
+	}
 }
 
 func kycNullStr(s string) interface{} {

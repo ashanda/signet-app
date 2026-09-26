@@ -197,6 +197,13 @@ Get a certificate with [certbot](https://certbot.eff.org/) (`certbot
 --nginx -d your-domain.com`) or your CDN's built-in TLS if you're not
 self-hosting nginx.
 
+## 5b. File storage and backups
+
+KYC uploads go to local disk (`backend/storage/kyc/`) by default, or to a
+private S3 bucket with `STORAGE_DRIVER=s3`. A daily `mysqldump` to the
+same bucket runs from a systemd timer. For setup, migrating the existing
+images and restoring a backup, see [docs/S3_SETUP.md](docs/S3_SETUP.md).
+
 ## 6. Updating a deployment
 
 ```bash

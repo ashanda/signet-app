@@ -1,0 +1,20 @@
+{
+  "Rules": [
+    {
+      "ID": "db-backups-retention",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "db-backups/" },
+      "Transitions": [{ "Days": 30, "StorageClass": "STANDARD_IA" }],
+      "Expiration": { "Days": 90 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 30 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    },
+    {
+      "ID": "kyc-old-versions",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "kyc/" },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 90 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    }
+  ]
+}

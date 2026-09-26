@@ -332,6 +332,6 @@ to confirm it's active).
 - [ ] MySQL `signet` user (not `root`) is what the backend `.env` uses
 - [ ] `SESSION_SECRET` is a real random value, not the placeholder
 - [ ] Static IP attached so a reboot doesn't change your DNS target
-- [ ] Set up a MySQL backup (Lightsail's own automatic snapshots cover the
-      whole instance disk, but a `mysqldump` cron job to offsite storage is
-      cheap insurance — not covered here, ask if you want that added)
+- [ ] KYC images in S3 and a daily MySQL backup to S3, following
+      [S3_SETUP.md](S3_SETUP.md). `systemctl list-timers signet-db-backup.timer`
+      should show a recent LAST run.
