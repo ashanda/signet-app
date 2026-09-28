@@ -227,19 +227,19 @@ func creditWallet(db *sqlx.DB, userID uint64, amount float64, description string
 		Earn  string `db:"earn"`
 		Price int64  `db:"price"`
 	}
+	// A user with no user_packages row at all takes the overflow branch,
+	// like the original's `if ($checkUserPackage && ...) else { company }`.
 	err = tx.Get(&up, `
-		SELECT up.id, up.earn, p.price
+		SELECT up.id, COALESCE(up.earn, '') AS earn, COALESCE(p.price, 0) AS price
 		FROM user_packages up
 		LEFT JOIN packages p ON p.id = CAST(up.package AS UNSIGNED)
 		WHERE up.user_id = ? LIMIT 1`, userID)
-	if err == sql.ErrNoRows {
-		return tx.Commit()
-	}
-	if err != nil {
+	hasPackage := err == nil
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
-	earnValue := atof(up.Earn)
-	if earnValue <= float64(up.Price)*4 {
+	if hasPackage && atof(up.Earn) <= float64(up.Price)*4 {
+		earnValue := atof(up.Earn)
 		if _, err := tx.Exec("UPDATE user_packages SET earn = ?, updated_at = NOW() WHERE id = ?", ftoa(earnValue+amount), up.ID); err != nil {
 			return err
 		}

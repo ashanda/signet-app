@@ -229,6 +229,7 @@ func kycStoreHandler(d *app.Deps) http.HandlerFunc {
 				errs["passport_image"] = []string{"The passport image field is required."}
 			}
 		}
+		kycValidateImages(r, errs)
 		if len(errs) > 0 {
 			httpx.ValidationError(w, errs)
 			return
@@ -319,6 +320,7 @@ func kycUpdateHandler(d *app.Deps) http.HandlerFunc {
 				errs["document_number"] = []string{"The document number has already been taken."}
 			}
 		}
+		kycValidateImages(r, errs)
 		if len(errs) > 0 {
 			httpx.ValidationError(w, errs)
 			return
@@ -459,6 +461,29 @@ func kycStoreFile(r *http.Request, store storage.Store, field, subdir string) (s
 		return "", err
 	}
 	return key, nil
+}
+
+// kycImageTypes are the formats Laravel's `image` rule accepts, minus SVG
+// (which can carry script and is excluded by default since Laravel 11).
+var kycImageTypes = map[string]bool{
+	"image/jpeg": true, "image/png": true, "image/gif": true, "image/bmp": true, "image/webp": true,
+}
+
+// kycValidateImages applies the `image` rule to every KYC file field that
+// was sent, judging by the file's content rather than its name.
+func kycValidateImages(r *http.Request, errs map[string][]string) {
+	for _, field := range []string{"nic_front", "nic_back", "passport_image"} {
+		file, _, err := r.FormFile(field)
+		if err != nil {
+			continue // absent: the required_if checks handle that
+		}
+		head := make([]byte, 512)
+		n, _ := io.ReadFull(file, head)
+		file.Close()
+		if !kycImageTypes[http.DetectContentType(head[:n])] {
+			errs[field] = []string{"The " + strings.ReplaceAll(field, "_", " ") + " field must be an image."}
+		}
+	}
 }
 
 // kycSafeExt keeps the client's extension (as the original did) only when

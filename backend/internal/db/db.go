@@ -21,6 +21,12 @@ func Connect(cfg *config.Config) (*sqlx.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect to mysql: %w", err)
 	}
+	// Unsafe: a column with no matching struct field is ignored instead of
+	// failing the query ("missing destination name ..."). The live database
+	// predates this code and may carry columns the Go models don't, and
+	// many queries use SELECT *; Eloquent never failed on those either.
+	// Transactions started from this pool inherit the setting.
+	conn = conn.Unsafe()
 	conn.SetMaxOpenConns(25)
 	conn.SetMaxIdleConns(10)
 	conn.SetConnMaxLifetime(5 * time.Minute)

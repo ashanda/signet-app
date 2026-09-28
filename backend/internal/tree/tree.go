@@ -211,7 +211,7 @@ func countUserParentByVirtual(db *sqlx.DB, virtualID uint64, nodes []string) (in
 }
 
 func firstUserParentByVirtual(db *sqlx.DB, virtualID uint64, nodes []string) (*userParentRow, error) {
-	query, args, err := sqlx.In("SELECT * FROM user_parents WHERE virtual_id = ? AND node IN (?) LIMIT 1", virtualID, nodes)
+	query, args, err := sqlx.In("SELECT id, user_id, virtual_id, parent_id, node FROM user_parents WHERE virtual_id = ? AND node IN (?) LIMIT 1", virtualID, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func firstUserParentByVirtual(db *sqlx.DB, virtualID uint64, nodes []string) (*u
 
 func firstUserParentByUserID(db *sqlx.DB, userID uint64) (*userParentRow, error) {
 	var row userParentRow
-	err := db.Get(&row, "SELECT * FROM user_parents WHERE user_id = ? LIMIT 1", userID)
+	err := db.Get(&row, "SELECT id, user_id, virtual_id, parent_id, node FROM user_parents WHERE user_id = ? LIMIT 1", userID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

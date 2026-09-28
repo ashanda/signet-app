@@ -222,6 +222,18 @@ func registerStep1Handler(d *app.Deps) http.HandlerFunc {
 		if err := d.DB.Get(&referral, "SELECT * FROM referral_codes WHERE code = ?", body.ReferralCode); err != nil {
 			errs["referral_code"] = []string{"The selected referral code is invalid."}
 		}
+		// 'leader_code'/'executive_code' => 'nullable|exists:users,id': both
+		// receive the 5% leadership bonus on activation, so they must be
+		// real user ids.
+		for field, code := range map[string]string{"leader_code": body.LeaderCode, "executive_code": body.ExecutiveCode} {
+			if code == "" {
+				continue
+			}
+			var n int
+			if err := d.DB.Get(&n, "SELECT COUNT(*) FROM users WHERE id = ?", code); err != nil || n == 0 {
+				errs[field] = []string{"The selected " + strings.ReplaceAll(field, "_", " ") + " is invalid."}
+			}
+		}
 		if body.LeaderCode != "" && body.LeaderCode == body.ExecutiveCode {
 			errs["executive_code"] = []string{"The executive code and leader code must be different."}
 		}
@@ -376,32 +388,46 @@ func registerStep2SubmitHandler(d *app.Deps) http.HandlerFunc {
 		rootRowID, _ := res.LastInsertId()
 		createdIDs = append(createdIDs, uint64(rootRowID))
 
-		// Binary-spillover correction: if the referrer now has 2+ children
-		// created at this exact created_at instant, keep the oldest as
-		// "gratitude" (copying the newest's placement) and mark a fresh
-		// "correct" row — see financial_engine.md / api_spec.md step 5.
+		// Same-instant race correction (AuthController@processStep2): only
+		// when 2+ children of the referrer were created at this row's exact
+		// created_at — i.e. two sign-ups landed in the same second — keep
+		// the oldest as "gratitude" (copying the newest's placement), add a
+		// "correct" row, and delete the newest. The created_at filter is
+		// essential: without it every referral after a referrer's first one
+		// overwrote an unrelated older user's row and deleted the new one.
 		if referredBy != 0 {
 			var siblings []struct {
-				ID        uint64    `db:"id"`
-				UserID    uint64    `db:"user_id"`
-				VirtualID uint64    `db:"virtual_id"`
-				ParentID  uint64    `db:"parent_id"`
-				CreatedAt time.Time `db:"created_at"`
+				ID        uint64 `db:"id"`
+				UserID    uint64 `db:"user_id"`
+				VirtualID uint64 `db:"virtual_id"`
+				ParentID  uint64 `db:"parent_id"`
 			}
-			_ = tx.Select(&siblings, `SELECT id, user_id, virtual_id, parent_id, created_at FROM user_parents
-				WHERE virtual_id = ? ORDER BY created_at ASC FOR UPDATE`, referredBy)
+			if err := tx.Select(&siblings, `SELECT id, user_id, virtual_id, parent_id FROM user_parents
+				WHERE virtual_id = ? AND created_at = (SELECT created_at FROM user_parents WHERE id = ?)
+				ORDER BY created_at ASC, id ASC FOR UPDATE`, referredBy, rootRowID); err != nil {
+				httpx.Error(w, http.StatusInternalServerError, "Could not place user in tree")
+				return
+			}
 			if len(siblings) >= 2 {
 				gratitudeRow := siblings[0]
 				activeRow := siblings[len(siblings)-1]
-				_, _ = tx.Exec(`UPDATE user_parents SET user_id=?, virtual_id=?, parent_id=?, updated_at=NOW() WHERE id=?`,
-					activeRow.UserID, activeRow.VirtualID, activeRow.ParentID, gratitudeRow.ID)
-				res, err := tx.Exec(`INSERT INTO user_parents (user_id, virtual_id, parent_id, node, created_at, updated_at)
-					VALUES (?, ?, ?, 'correct', NOW(), NOW())`, activeRow.UserID, activeRow.UserID, activeRow.ParentID)
-				if err == nil {
-					correctID, _ := res.LastInsertId()
-					createdIDs = append(createdIDs, uint64(correctID))
+				if _, err := tx.Exec(`UPDATE user_parents SET user_id=?, virtual_id=?, parent_id=?, updated_at=NOW() WHERE id=?`,
+					activeRow.UserID, activeRow.VirtualID, activeRow.ParentID, gratitudeRow.ID); err != nil {
+					httpx.Error(w, http.StatusInternalServerError, "Could not place user in tree")
+					return
 				}
-				_, _ = tx.Exec("DELETE FROM user_parents WHERE id = ?", activeRow.ID)
+				res, err := tx.Exec(`INSERT INTO user_parents (user_id, virtual_id, parent_id, node, created_at, updated_at)
+					VALUES (?, ?, ?, 'correct', NOW(), NOW())`, activeRow.UserID, activeRow.ParentID, activeRow.ParentID)
+				if err != nil {
+					httpx.Error(w, http.StatusInternalServerError, "Could not place user in tree")
+					return
+				}
+				correctID, _ := res.LastInsertId()
+				createdIDs = append(createdIDs, uint64(correctID))
+				if _, err := tx.Exec("DELETE FROM user_parents WHERE id = ?", activeRow.ID); err != nil {
+					httpx.Error(w, http.StatusInternalServerError, "Could not place user in tree")
+					return
+				}
 			}
 		}
 
@@ -446,7 +472,8 @@ func registerStep2SubmitHandler(d *app.Deps) http.HandlerFunc {
 			return
 		}
 
-		_, _ = tx.Exec(`UPDATE super_parent_logs SET user_package = ? WHERE gratitude_user = ? AND created_at >= ?`,
+		// SuperParentLog::where(...)->first()->update(): only one row.
+		_, _ = tx.Exec(`UPDATE super_parent_logs SET user_package = ? WHERE gratitude_user = ? AND created_at >= ? ORDER BY id LIMIT 1`,
 			newUserPackageID, newUserID, time.Now().Add(-1*time.Minute))
 
 		createdIDsJSON := "["
@@ -458,7 +485,7 @@ func registerStep2SubmitHandler(d *app.Deps) http.HandlerFunc {
 		}
 		createdIDsJSON += "]"
 		_, _ = tx.Exec(`INSERT INTO user_parent_map_logs (user_id, parent_id, created_row_ids, note, created_at, updated_at)
-			VALUES (?, ?, ?, 'UserParent rows created in processStep2', NOW(), NOW())`, newUserID, findParent.ParentID, createdIDsJSON)
+			VALUES (?, ?, ?, 'UserParent rows created in processStep2', NOW(), NOW())`, newUserID, parentID, createdIDsJSON)
 
 		if err := tx.Commit(); err != nil {
 			httpx.Error(w, http.StatusInternalServerError, "Database error")

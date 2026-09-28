@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -240,7 +241,10 @@ func activePackageHandler(d *app.Deps) http.HandlerFunc {
 				return
 			}
 
-			checkActivation, err := wallet.CheckWallet(d.DB, actingUser.ID, pkg.ID)
+			// checkWalet(auth id, $packageData->id): the PACKAGE id (packages
+			// table), not the user_packages row id.
+			packageID, _ := parseUintParam(pkg.PackageStr)
+			checkActivation, err := wallet.CheckWallet(d.DB, actingUser.ID, packageID)
 			// Note: CheckWallet reads via d.DB (its own connection), not tx —
 			// matching the original which also issues checkWalet() as
 			// independent queries rather than inside the same transaction.
@@ -254,6 +258,10 @@ func activePackageHandler(d *app.Deps) http.HandlerFunc {
 			}
 
 			if err := processPackageActivation(tx, &pkg, actingUser.ID, needTokens, feePercentage); err != nil {
+				if errors.Is(err, errNoUserParent) {
+					httpx.JSON(w, http.StatusNotFound, map[string]interface{}{"message": "User-parent relationship not found."})
+					return
+				}
 				httpx.Error(w, http.StatusInternalServerError, "Could not activate package: "+err.Error())
 				return
 			}
@@ -293,28 +301,31 @@ func activePackagesCapValueTx(tx *sqlx.Tx, userID uint64) (float64, error) {
 
 var excludedPoolUserIDs = map[uint64]bool{2: true, 3: true, 4: true, 5: true}
 
+var errNoUserParent = errors.New("user-parent relationship not found")
+
 func processPackageActivation(tx *sqlx.Tx, pkg *activatingPackage, actingUserID uint64, needTokens, feePercentage int64) error {
 	var findUser struct {
 		ID        uint64 `db:"id"`
 		VirtualID uint64 `db:"virtual_id"`
 		Node      string `db:"node"`
 	}
-	hasFindUser := true
+	// Deliberate deviation: the original returned a 404 from this private
+	// method, but the caller ignored it and still burned the sponsor's
+	// tokens and answered "success" with nothing activated. Failing the
+	// whole transaction instead keeps the tokens.
 	if err := tx.Get(&findUser, "SELECT id, virtual_id, node FROM user_parents WHERE user_id = ? LIMIT 1", pkg.UserID); err != nil {
-		if err != sql.ErrNoRows {
-			return err
+		if err == sql.ErrNoRows {
+			return errNoUserParent
 		}
-		hasFindUser = false // matches original's ignored 404 — execution continues
+		return err
 	}
 
-	if hasFindUser {
-		newNode := "active"
-		if findUser.Node == "gratitude" {
-			newNode = "gratitude"
-		}
-		if _, err := tx.Exec("UPDATE user_parents SET node = ?, updated_at = NOW() WHERE id = ?", newNode, findUser.ID); err != nil {
-			return err
-		}
+	newNode := "active"
+	if findUser.Node == "gratitude" {
+		newNode = "gratitude"
+	}
+	if _, err := tx.Exec("UPDATE user_parents SET node = ?, updated_at = NOW() WHERE id = ?", newNode, findUser.ID); err != nil {
+		return err
 	}
 
 	activatedAt := time.Now()
@@ -329,8 +340,11 @@ func processPackageActivation(tx *sqlx.Tx, pkg *activatingPackage, actingUserID 
 	}
 
 	if pkg.Sale == "other" {
+		// UserPackage::where(user, active)->first() runs after this package
+		// was set active, so it is the lowest-id active package — possibly
+		// this one — exactly as in the original.
 		var oldPackageID models.NullInt64
-		_ = tx.Get(&oldPackageID, `SELECT id FROM user_packages WHERE user_id = ? AND status='active' AND id != ? ORDER BY id DESC LIMIT 1`, pkg.UserID, pkg.ID)
+		_ = tx.Get(&oldPackageID, `SELECT id FROM user_packages WHERE user_id = ? AND status='active' ORDER BY id ASC LIMIT 1`, pkg.UserID)
 		if oldPackageID.Valid {
 			var discount struct {
 				CurrentUserID uint64 `db:"current_user_id"`
@@ -349,7 +363,7 @@ func processPackageActivation(tx *sqlx.Tx, pkg *activatingPackage, actingUserID 
 		}
 	}
 
-	if hasFindUser && findUser.Node == "gratitude" {
+	if findUser.Node == "gratitude" {
 		if err := tokenTransferTx(tx, 1, findUser.VirtualID, int64(float64(pkg.PackagePrice)*0.20)); err != nil {
 			return err
 		}
@@ -374,15 +388,16 @@ func processPackageActivation(tx *sqlx.Tx, pkg *activatingPackage, actingUserID 
 	if err := tx.Get(&owner, "SELECT * FROM users WHERE id = ?", pkg.UserID); err != nil {
 		return err
 	}
+	// PHP's !empty() also treats "0" as empty — never credit user 0.
 	if owner.LeaderCode.Valid && owner.LeaderCode.String != "" {
-		if leaderID, ok := parseUintParam(owner.LeaderCode.String); ok {
+		if leaderID, ok := parseUintParam(owner.LeaderCode.String); ok && leaderID != 0 {
 			if err := creditWalletTx(tx, leaderID, float64(pkg.PackagePrice)*(5.0/100), "Leadership Bonus"); err != nil {
 				return err
 			}
 		}
 	}
 	if owner.ExecutiveCode.Valid && owner.ExecutiveCode.String != "" {
-		if execID, ok := parseUintParam(owner.ExecutiveCode.String); ok {
+		if execID, ok := parseUintParam(owner.ExecutiveCode.String); ok && execID != 0 {
 			if err := creditWalletTx(tx, execID, float64(pkg.PackagePrice)*(5.0/100), "Leadership Bonus"); err != nil {
 				return err
 			}
@@ -507,22 +522,22 @@ func creditWalletTx(tx *sqlx.Tx, userID uint64, amount float64, description stri
 		Earn  string `db:"earn"`
 		Price int64  `db:"price"`
 	}
-	err = tx.Get(&up, `SELECT up.id, up.earn, p.price FROM user_packages up LEFT JOIN packages p ON p.id = CAST(up.package AS UNSIGNED) WHERE up.user_id = ? LIMIT 1`, userID)
-	if err == sql.ErrNoRows {
-		return nil
-	}
-	if err != nil {
+	// No user_packages row takes the overflow branch too, like the
+	// original's `if ($checkUserPackage && ...) else { company }`.
+	err = tx.Get(&up, `SELECT up.id, COALESCE(up.earn, '') AS earn, COALESCE(p.price, 0) AS price FROM user_packages up LEFT JOIN packages p ON p.id = CAST(up.package AS UNSIGNED) WHERE up.user_id = ? LIMIT 1`, userID)
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
-	earnValue := atofF(up.Earn)
-	if earnValue <= float64(up.Price)*4 {
-		_, err = tx.Exec("UPDATE user_packages SET earn = ?, updated_at = NOW() WHERE id = ?", ftoaF(earnValue+amount), up.ID)
+	if err == nil && atofF(up.Earn) <= float64(up.Price)*4 {
+		_, err = tx.Exec("UPDATE user_packages SET earn = ?, updated_at = NOW() WHERE id = ?", ftoaF(atofF(up.Earn)+amount), up.ID)
 		return err
 	}
 	if _, err := tx.Exec("UPDATE wallets SET balance = balance + ?, updated_at = NOW() WHERE user_id = 1", amount); err != nil {
 		return err
 	}
-	_, err = tx.Exec(`INSERT INTO earn_logs (user_id, amount, created_at, updated_at) VALUES ('1', ?, NOW(), NOW())`, ftoaF(amount))
+	// TokenController::updateWallet logs the description on the company row
+	// too (WalletService's version doesn't).
+	_, err = tx.Exec(`INSERT INTO earn_logs (user_id, amount, description, created_at, updated_at) VALUES ('1', ?, ?, NOW(), NOW())`, ftoaF(amount), description)
 	return err
 }
 

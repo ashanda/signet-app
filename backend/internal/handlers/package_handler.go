@@ -266,12 +266,13 @@ func buyPackagesHandler(d *app.Deps) http.HandlerFunc {
 				break
 			}
 			var parentUser models.User
-			if uerr := d.DB.Get(&parentUser, "SELECT * FROM users WHERE id = ?", parentID); uerr == nil {
-				if parentUser.Status == "active" {
-					activeParentID = parentID
-					foundActiveAncestor = true
-					break
-				}
+			if uerr := d.DB.Get(&parentUser, "SELECT * FROM users WHERE id = ?", parentID); uerr != nil {
+				break // `if (!$parentUser) break;`
+			}
+			if parentUser.Status == "active" {
+				activeParentID = parentID
+				foundActiveAncestor = true
+				break
 			}
 			current = parentID
 		}

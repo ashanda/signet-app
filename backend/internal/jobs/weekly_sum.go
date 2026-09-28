@@ -87,7 +87,7 @@ func RunWeeklySum(db *sqlx.DB) error {
 		}
 		err := db.Get(&pkg, `
 			SELECT p.price FROM user_packages up JOIN packages p ON p.id = CAST(up.package AS UNSIGNED)
-			WHERE up.user_id = ? AND up.status = 'active' ORDER BY up.id DESC LIMIT 1`, u.ID)
+			WHERE up.user_id = ? AND up.status = 'active' ORDER BY up.id ASC LIMIT 1`, u.ID) // ->first(): lowest id, as the original
 		if err == sql.ErrNoRows {
 			continue // skip user if no active package
 		}

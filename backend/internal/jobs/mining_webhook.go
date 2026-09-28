@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -60,21 +59,23 @@ func RunMiningWebhook(db *sqlx.DB, cfg *config.Config) error {
 	client := &http.Client{Timeout: 20 * time.Second}
 
 	for _, rec := range records {
-		var secretKey string
-		if err := db.Get(&secretKey, "SELECT secret_key FROM user_secret_keys WHERE user_id = ? LIMIT 1", rec.UserID); err != nil {
-			log.Printf("jobs: mining:send-webhook: no secret key for user %d, skipping record %d: %v", rec.UserID, rec.ID, err)
+		// optional($record->secretKey)->secret_key: a user without a key is
+		// still sent, with user_id null.
+		var secretKey sql.NullString
+		if err := db.Get(&secretKey, "SELECT secret_key FROM user_secret_keys WHERE user_id = ? LIMIT 1", rec.UserID); err != nil && err != sql.ErrNoRows {
+			log.Printf("jobs: mining:send-webhook: could not read secret key for user %d (record %d): %v", rec.UserID, rec.ID, err)
 			continue
 		}
 
 		payload := map[string]interface{}{
 			"id":           rec.ID,
-			"user_id":      secretKey, // the OPAQUE hashed secret key string, not the numeric user id
+			"user_id":      nullableString(secretKey), // the OPAQUE hashed secret key string, not the numeric user id
 			"total_token":  rec.TotalToken,
 			"mining_token": rec.MiningToken,
 			"daily_mining": rec.DailyMining,
 			"status":       rec.Status,
-			"created_at":   rec.CreatedAt.Time,
-			"updated_at":   rec.UpdatedAt.Time,
+			"created_at":   phpDateTime(rec.CreatedAt),
+			"updated_at":   phpDateTime(rec.UpdatedAt),
 		}
 		body, err := json.Marshal(payload)
 		if err != nil {
@@ -106,9 +107,25 @@ func RunMiningWebhook(db *sqlx.DB, cfg *config.Config) error {
 			}
 			continue
 		}
-		miningWebhookRecordFailure(db, rec.ID, rec.WebhookAttempts, fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)))
+		log.Printf("jobs: mining:send-webhook: record %d got HTTP %d", rec.ID, resp.StatusCode)
+		miningWebhookRecordFailure(db, rec.ID, rec.WebhookAttempts, string(respBody))
 	}
 	return nil
+}
+
+// phpDateTime formats like optional($t)->format('Y-m-d H:i:s').
+func phpDateTime(t sql.NullTime) interface{} {
+	if !t.Valid {
+		return nil
+	}
+	return t.Time.Format("2006-01-02 15:04:05")
+}
+
+func nullableString(s sql.NullString) interface{} {
+	if !s.Valid {
+		return nil
+	}
+	return s.String
 }
 
 func miningWebhookRecordFailure(db *sqlx.DB, id uint64, priorAttempts int, response string) {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -48,6 +49,37 @@ func TestKycSafeExt(t *testing.T) {
 	} {
 		if got := kycSafeExt(in); got != want {
 			t.Errorf("kycSafeExt(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestKycValidateImages(t *testing.T) {
+	build := func(field, content string) *http.Request {
+		var buf strings.Builder
+		mw := multipart.NewWriter(&buf)
+		fw, _ := mw.CreateFormFile(field, "upload.jpg")
+		fw.Write([]byte(content))
+		mw.Close()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(buf.String()))
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.ParseMultipartForm(1 << 20)
+		return req
+	}
+	png := "\x89PNG\r\n\x1a\n" + strings.Repeat("x", 20)
+	for name, tc := range map[string]struct {
+		content string
+		wantErr bool
+	}{
+		"png":             {png, false},
+		"jpeg":            {"\xff\xd8\xff\xe0" + strings.Repeat("x", 20), false},
+		"html named .jpg": {"<html><script>alert(1)</script></html>", true},
+		"svg":             {`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`, true},
+		"pdf":             {"%PDF-1.4 ...", true},
+	} {
+		errs := map[string][]string{}
+		kycValidateImages(build("nic_front", tc.content), errs)
+		if got := len(errs["nic_front"]) > 0; got != tc.wantErr {
+			t.Errorf("%s: error=%v, want %v", name, got, tc.wantErr)
 		}
 	}
 }

@@ -170,13 +170,20 @@ func salariesStoreHandler(d *app.Deps) http.HandlerFunc {
 			return
 		}
 
-		if _, err := d.DB.Exec(`INSERT INTO salaries (user_id, amount, salary_date, remarks, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())`,
-			body.UserID, body.Amount, salaryDate, salaryNullableString(body.Remarks)); err != nil {
+		res, err := d.DB.Exec(`INSERT INTO salaries (user_id, amount, salary_date, remarks, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())`,
+			body.UserID, body.Amount, salaryDate, salaryNullableString(body.Remarks))
+		if err != nil {
 			httpx.JSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "message": "Could not add salary: " + err.Error()})
 			return
 		}
 
 		if err := wallet.UpdateWallet(d.DB, body.UserID, body.Amount, "Salary credited"); err != nil {
+			// The original's DB::transaction rolls the salary row back when
+			// the credit fails; UpdateWallet commits on its own, so undo the
+			// row here instead of leaving an unpaid "salary" behind.
+			if salaryID, idErr := res.LastInsertId(); idErr == nil {
+				_, _ = d.DB.Exec("DELETE FROM salaries WHERE id = ?", salaryID)
+			}
 			httpx.JSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "message": "Could not add salary: " + err.Error()})
 			return
 		}

@@ -45,7 +45,7 @@ func miningUsersHandler(d *app.Deps) http.HandlerFunc {
 
 func miningSearchHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := parseUintParam(chi.URLParam(r, "id"))
+		id, ok := parseUintParam(signetIDToNumeric(chi.URLParam(r, "id")))
 		if !ok {
 			httpx.OK(w, map[string]interface{}{"success": false, "message": "User not found"})
 			return
@@ -112,7 +112,7 @@ func miningSearchHandler(d *app.Deps) http.HandlerFunc {
 // first insert, matching `new UserMining()`).
 func miningUpdateHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := parseUintParam(chi.URLParam(r, "id"))
+		id, ok := parseUintParam(signetIDToNumeric(chi.URLParam(r, "id")))
 		if !ok {
 			httpx.OK(w, map[string]interface{}{"success": false, "message": "User not found"})
 			return

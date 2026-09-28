@@ -20,8 +20,15 @@ import (
 // any individual credit fails mid-run the period is NOT marked distributed,
 // so a safe re-run will re-pay everyone (including already-paid users — no
 // per-user idempotency, only whole-period, matching the original verbatim).
+//
+// The original pays now()'s month, i.e. it was run at the END of the month.
+// This runs daily, so it pays the most recent COMPLETED month instead —
+// same pool, same period label — rather than paying the current month on
+// its first day with a partial pool and marking the month done.
 func RunShareCalculate(db *sqlx.DB) error {
-	period := time.Now().Format("2006-01")
+	now := time.Now()
+	lastMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -1, 0)
+	period := lastMonth.Format("2006-01")
 
 	var alreadyDistributed int
 	if err := db.Get(&alreadyDistributed, "SELECT COUNT(*) FROM global_director_share_distributions WHERE period = ?", period); err != nil {
@@ -31,12 +38,11 @@ func RunShareCalculate(db *sqlx.DB) error {
 		return nil
 	}
 
-	now := time.Now()
 	var totalPool sql.NullFloat64
 	if err := db.Get(&totalPool, `
 		SELECT COALESCE(SUM(pool_amount), 0) FROM package_pools
 		WHERE YEAR(created_at) = ? AND MONTH(created_at) = ? AND pool_amount > 0`,
-		now.Year(), int(now.Month())); err != nil {
+		lastMonth.Year(), int(lastMonth.Month())); err != nil {
 		return err
 	}
 	if totalPool.Float64 <= 0 {

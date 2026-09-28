@@ -142,7 +142,7 @@ func allUsersHandler(d *app.Deps) http.HandlerFunc {
 // GET /users/search/{id} — UserController@search
 func userSearchHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := parseUintParam(chi.URLParam(r, "id"))
+		id, ok := parseUintParam(signetIDToNumeric(chi.URLParam(r, "id")))
 		if !ok {
 			httpx.Error(w, http.StatusBadRequest, "Invalid user id")
 			return
@@ -217,8 +217,11 @@ func userSearchHandler(d *app.Deps) http.HandlerFunc {
 			},
 			"packages": map[string]interface{}{"first": firstPkgName.String, "last": lastPkgName.String},
 			"mining":   miningOut,
-			"sales":    map[string]interface{}{"total_sales": totalSales.Float64, "direct_sales": directSale},
-			"wallet":   map[string]interface{}{"total_wallet": totalWallet},
+			// 'total_sales' => $userparent: the original sends the COUNT of
+			// user_parents rows under this user (shown as "Sale Count"), not
+			// the price total — totalSales only feeds total_wallet.
+			"sales":  map[string]interface{}{"total_sales": userparent, "direct_sales": directSale},
+			"wallet": map[string]interface{}{"total_wallet": totalWallet},
 		})
 	}
 }
@@ -229,7 +232,7 @@ func userSearchHandler(d *app.Deps) http.HandlerFunc {
 // shape against a different column.
 func userSimpleStatusUpdateHandler(d *app.Deps, column string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := parseUintParam(chi.URLParam(r, "id"))
+		id, ok := parseUintParam(signetIDToNumeric(chi.URLParam(r, "id")))
 		if !ok {
 			httpx.Error(w, http.StatusBadRequest, "Invalid user id")
 			return
@@ -290,7 +293,7 @@ func updateExecutiveCodeHandler(d *app.Deps) http.HandlerFunc {
 // fmt.Sprintf here carries no injection risk.
 func updateUserCode(w http.ResponseWriter, r *http.Request, d *app.Deps, rawCode, logTable, oldCol, newCol, userCol, respKey string) {
 	actingUser := auth.UserFromContext(r.Context())
-	id, ok := parseUintParam(chi.URLParam(r, "id"))
+	id, ok := parseUintParam(signetIDToNumeric(chi.URLParam(r, "id")))
 	if !ok {
 		httpx.Error(w, http.StatusBadRequest, "Invalid user id")
 		return
@@ -448,7 +451,7 @@ func codeLogsHandler(d *app.Deps, table, oldCol, newCol string) http.HandlerFunc
 // POST /users/update-global-director-share/{id} — UserController@updateGlobalDirectorShare
 func updateGlobalDirectorShareHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := parseUintParam(chi.URLParam(r, "id"))
+		id, ok := parseUintParam(signetIDToNumeric(chi.URLParam(r, "id")))
 		if !ok {
 			httpx.Error(w, http.StatusBadRequest, "Invalid user id")
 			return
