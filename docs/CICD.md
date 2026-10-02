@@ -98,7 +98,10 @@ Optional **variables** (same screen, *Environment variables*):
 
 | Variable | Default |
 |---|---|
-| `DEPLOY_URL` | `https://go.signetint.net`, used for the final health check |
+| `APP_DOMAIN` | unset: the deploy doesn't touch nginx. Set it to let deploys manage the domain; see [Changing the domain](#changing-the-domain) |
+| `OLD_DOMAINS` | unset. Old domains that should redirect to `APP_DOMAIN` |
+| `CERTBOT_EMAIL` | unset. E-mail for Let's Encrypt expiry notices |
+| `DEPLOY_URL` | `https://<APP_DOMAIN>`, else `https://go.signetint.net`. Used for the final health check |
 | `DEPLOY_GOARCH` | `amd64`; set to `arm64` for an ARM server |
 
 Then delete `signet_deploy` and `signet_deploy.pub` from your PC, or keep
@@ -146,6 +149,42 @@ deploy: done — <commit> is live
   look at the latest Deploy run.
 - **Logs of a deploy:** the Actions run. Everything the server script
   prints shows up there.
+
+## Changing the domain
+
+The domain is a GitHub variable. The server's IP doesn't change; you add
+the DNS record yourself in Cloudflare.
+
+1. **Cloudflare:** add an `A` record for the new name pointing at the
+   server's static IP. **Set it to DNS only (grey cloud) for now.** The
+   first certificate request needs to reach the server directly.
+2. **GitHub → Settings → Environments → production → Variables:**
+   - `APP_DOMAIN` = the new domain, for example `app.example.com`
+   - `OLD_DOMAINS` = the previous domain(s), for example `go.signetint.net`.
+     They keep working and redirect to the new one, so shared referral
+     links don't break.
+3. **Actions → Deploy → Run workflow** (or merge any PR).
+4. When the run is green, switch the Cloudflare record to **Proxied
+   (orange)** if you want, with **SSL/TLS mode Full (strict)**.
+
+What the deploy does, in `deploy/configure-domain.sh`:
+- Stops early if the name doesn't resolve yet. Nothing is changed.
+- Gets a Let's Encrypt certificate for the new name if it has none. The
+  live site keeps serving while it does. Renewal is automatic and also
+  works behind the Cloudflare proxy.
+- Regenerates **only** `/etc/nginx/sites-available/signet` and reloads
+  nginx. Other sites (phpMyAdmin) are untouched. The previous file is
+  saved next to it as `signet.bak-<time>`. If nginx rejects the new
+  config, the old one is put back and the deploy fails.
+- Sets `APP_URL` and `FRONTEND_ORIGIN` in `.env.production`, so referral
+  links and password-reset e-mails use the new domain.
+
+With `APP_DOMAIN` set to the current domain, deploys just keep the config
+in sync. The **first** such deploy replaces the hand-written nginx file
+with the generated one; the run log shows the diff.
+
+Users have to log in once on the new domain, because browsers keep the
+login cookie per domain. Google Authenticator codes are not affected.
 
 ## Rolling back
 

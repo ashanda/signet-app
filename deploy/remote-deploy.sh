@@ -83,6 +83,15 @@ if ! (cd "$APP_DIR/backend" && "$rel/migrate"); then
 	die "migrations failed — nothing was swapped, the previous release is still live"
 fi
 
+# --- 2b. domain (only when the GitHub variable APP_DOMAIN is set) ----------
+# Before the restart below, so a changed APP_URL is picked up by it.
+if [[ -n "${APP_DOMAIN:-}" ]]; then
+	log "configuring domain $APP_DOMAIN"
+	if ! APP_DIR="$APP_DIR" ENV_FILE="$ENV_FILE" PORT="${PORT:-8080}" bash "$rel/deploy/configure-domain.sh"; then
+		die "domain setup failed — nothing was swapped, the previous release is still live"
+	fi
+fi
+
 # --- 3. backend -----------------------------------------------------------
 bin="$APP_DIR/backend/signet-api"
 if [[ -f "$bin" ]]; then
