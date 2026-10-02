@@ -7,7 +7,6 @@
 # see backend/migrations/README.md (`migrate rollback`) if one must be.
 set -Eeuo pipefail
 
-
 APP_DIR="${APP_DIR:-/opt/signet}"
 SERVICE="${SERVICE:-signet-api}"
 PORT="$(grep -E '^PORT=' "$APP_DIR/backend/.env.production" 2>/dev/null | cut -d= -f2 || true)"
