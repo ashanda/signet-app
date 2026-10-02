@@ -171,7 +171,7 @@ func viewTokensHandler(d *app.Deps) http.HandlerFunc {
 func activePackageHandler(d *app.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			PackageID string `json:"package_id"`
+			PackageID flexString `json:"package_id"`
 		}
 		_ = decodeJSON(r, &body) // not validated in the original either — see api_spec.md
 
