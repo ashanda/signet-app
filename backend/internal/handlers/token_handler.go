@@ -346,10 +346,7 @@ func processPackageActivation(tx *sqlx.Tx, pkg *activatingPackage, actingUserID 
 		return err
 	}
 
-	activatedAt := time.Now()
-	if loc, err := time.LoadLocation("Asia/Colombo"); err == nil {
-		activatedAt = time.Now().In(loc)
-	}
+	activatedAt := colomboWallClock()
 	if _, err := tx.Exec("UPDATE user_packages SET status='active', activated_at=? , updated_at=NOW() WHERE id=?", activatedAt, pkg.ID); err != nil {
 		return err
 	}
@@ -437,10 +434,7 @@ func processPackageActivationCompany(tx *sqlx.Tx, pkg *activatingPackage) error 
 	if _, err := tx.Exec("UPDATE user_parents SET node='active', updated_at=NOW() WHERE id=?", findUser.ID); err != nil {
 		return err
 	}
-	activatedAt := time.Now()
-	if loc, err := time.LoadLocation("Asia/Colombo"); err == nil {
-		activatedAt = time.Now().In(loc)
-	}
+	activatedAt := colomboWallClock()
 	if _, err := tx.Exec("UPDATE user_packages SET status='active', activated_at=?, updated_at=NOW() WHERE id=?", activatedAt, pkg.ID); err != nil {
 		return err
 	}
@@ -725,4 +719,17 @@ func atofF(s string) float64 {
 		return 0
 	}
 	return f
+}
+
+// colomboWallClock reproduces how the original stored activated_at:
+// Carbon::now('Asia/Colombo') written through a UTC connection, i.e. the
+// Sri Lanka wall-clock time stored as if it were UTC. Weekly ROC selects
+// packages by activated_at, so new rows must follow the same convention as
+// the existing ones.
+func colomboWallClock() time.Time {
+	now := time.Now()
+	if loc, err := time.LoadLocation("Asia/Colombo"); err == nil {
+		now = now.In(loc)
+	}
+	return time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), 0, time.UTC)
 }
