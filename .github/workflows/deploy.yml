@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: production
-      url: ${{ vars.DEPLOY_URL || 'https://go.signetint.net' }}
+      url: ${{ vars.DEPLOY_URL || (vars.APP_DOMAIN && format('https://{0}', vars.APP_DOMAIN)) || 'https://go.signetint.net' }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -115,11 +115,37 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
+      - name: Check domain settings
+        env:
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+          OLD_DOMAINS: ${{ vars.OLD_DOMAINS }}
+          CERTBOT_EMAIL: ${{ vars.CERTBOT_EMAIL }}
+        run: |
+          # These end up in a shell command on the server: only plain domain
+          # names and an e-mail address get through.
+          re='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
+          if [ -n "$APP_DOMAIN" ] && ! [[ "$APP_DOMAIN" =~ $re ]]; then
+            echo "::error::APP_DOMAIN '$APP_DOMAIN' is not a valid lowercase domain name"; exit 1
+          fi
+          for d in ${OLD_DOMAINS//,/ }; do
+            [[ "$d" =~ $re ]] || { echo "::error::OLD_DOMAINS entry '$d' is not a valid lowercase domain name"; exit 1; }
+          done
+          if [ -n "$CERTBOT_EMAIL" ] && ! [[ "$CERTBOT_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+            echo "::error::CERTBOT_EMAIL is not a valid e-mail address"; exit 1
+          fi
+          if [ -n "$OLD_DOMAINS" ] && [ -z "$APP_DOMAIN" ]; then
+            echo "::error::OLD_DOMAINS needs APP_DOMAIN"; exit 1
+          fi
+          echo "domain: ${APP_DOMAIN:-(not managed, APP_DOMAIN unset)}"
+
       - name: Upload and install
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_USER }}
           SSH_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+          OLD_DOMAINS: ${{ vars.OLD_DOMAINS }}
+          CERTBOT_EMAIL: ${{ vars.CERTBOT_EMAIL }}
         run: |
           tarball="signet-${DEPLOY_SHA}.tar.gz"
           common=(-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20)
@@ -128,12 +154,13 @@ jobs:
           ssh "${common[@]}" -p "$SSH_PORT" "$SSH_USER@$HOST" "set -e
             tmp=\$(mktemp -d)
             tar -xzf /tmp/$tarball -C \"\$tmp\" ./deploy/remote-deploy.sh
-            sudo bash \"\$tmp/deploy/remote-deploy.sh\" /tmp/$tarball
+            sudo APP_DOMAIN='$APP_DOMAIN' OLD_DOMAINS='$OLD_DOMAINS' CERTBOT_EMAIL='$CERTBOT_EMAIL' \
+              bash \"\$tmp/deploy/remote-deploy.sh\" /tmp/$tarball
             rm -rf \"\$tmp\""
 
       - name: Public health check
         env:
-          URL: ${{ vars.DEPLOY_URL || 'https://go.signetint.net' }}
+          URL: ${{ vars.DEPLOY_URL || (vars.APP_DOMAIN && format('https://{0}', vars.APP_DOMAIN)) || 'https://go.signetint.net' }}
         run: |
           for i in $(seq 1 10); do
             if curl -fsS --max-time 5 "$URL/api/v1/health" | grep -q '"ok"'; then
